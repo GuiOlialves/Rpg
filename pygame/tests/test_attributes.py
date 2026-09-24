@@ -40,7 +40,7 @@ class AttributeTests(unittest.TestCase):
     def test_each_primary_stat_changes_derived_without_full_heal(self):
         player = self.player()
         self.assertEqual((player.max_hp, player.max_sp, player.physical_attack, player.magic_power),
-                         (100, 60, 24, 13))
+                         (100, 60, 13, 13))
         player.hp, player.sp = 72, 24
         player.stat_points = 4
         before_defense = player.defense
@@ -51,7 +51,7 @@ class AttributeTests(unittest.TestCase):
         self.assertEqual((player.hp, player.max_hp), (77, 105))
         self.assertGreater(player.defense, before_defense)
         self.assertTrue(player.spend_stat("força"))
-        self.assertEqual(player.physical_attack, 26)
+        self.assertEqual(player.physical_attack, 14)
         self.assertGreater(player.knockback_power, before_knockback)
         self.assertTrue(player.spend_stat("magia"))
         self.assertEqual((player.sp, player.max_sp), (28, 64))
@@ -69,7 +69,7 @@ class AttributeTests(unittest.TestCase):
         player.hp, player.sp = 61, 22
         blade, armor, charm = item("iron_blade"), item("reinforced_leather"), item("grove_charm")
         player.equip(blade)
-        self.assertEqual((player.final_stats["força"], player.physical_attack), (10, 28))
+        self.assertEqual((player.final_stats["força"], player.physical_attack), (10, 15))
         self.assertEqual(player.equipment_bonus["força"], 2)
         player.equip(armor)
         self.assertEqual((player.max_hp, player.hp), (110, 71))
@@ -82,7 +82,7 @@ class AttributeTests(unittest.TestCase):
             self.assertEqual((player.final_stats, player.physical_attack, player.defense), previous)
         player.modifiers["physical_attack"] = 3
         player.recalculate_stats()
-        self.assertEqual(player.physical_attack, 31)
+        self.assertEqual(player.physical_attack, 18)
         self.assertEqual(player.stats, base)
         player.unequip("Armadura")
         self.assertEqual(player.max_hp, 105)

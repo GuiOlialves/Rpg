@@ -10,6 +10,7 @@ import forest
 import desert
 import ambient
 import environment
+import game_over
 from enemy import Enemy
 from npc import NPC, nearest
 from dialogue import DialogueBox
@@ -30,8 +31,13 @@ DASH_FRAMES = 11
 DASH_SPEED = 9.0
 DASH_COOLDOWN_FRAMES = 39
 DASH_IFRAMES = 6
-SP_REGEN_DELAY = 180
-SP_REGEN_INTERVAL = 45
+PLAYER_HIT_IFRAMES = 36
+RESPAWN_IFRAMES = 60
+SP_REGEN_DELAY = 240
+SP_REGEN_INTERVAL = 60
+CONSUMABLE_COOLDOWN_FRAMES = 90
+HITSTOP_NORMAL_FRAMES = 2
+HITSTOP_STRONG_FRAMES = 3
 
 def load(path: str) -> pygame.Surface:
     return pygame.image.load(ROOT / path).convert_alpha()
@@ -263,7 +269,7 @@ class Player:
             return False
         reduced = attributes.physical_damage_after_defense(amount, self.defense)
         self.hp = max(0, self.hp - reduced)
-        self.invulnerability_timer = 48
+        self.invulnerability_timer = PLAYER_HIT_IFRAMES
         if from_x is not None and from_y is not None:
             length = max(1.0, math.hypot(self.x - from_x, self.y - from_y))
             self.knockback_x = (self.x - from_x) / length * 3.8 * knockback
@@ -322,6 +328,15 @@ def build_region(name, opened_chests=None):
     if name == "forest": return forest.build(load)
     if name == "desert": return desert.build(load, opened_chests)
     raise ValueError(f"Região desconhecida: {name}")
+
+
+def reset_forest_boss_encounter():
+    region = build_region("forest")
+    region["arena_locked"] = True
+    region["north_locked"] = True
+    region["obstacles"].append(region["exits"]["desert"].inflate(30, 20))
+    boss = Enemy("forest_guardian", (1300, 430), load, seed=77)
+    return region, [boss]
 
 def spawn_enemies(region):
     return [Enemy(kind, position, load, seed=index) for index, (kind, position) in enumerate(region.get("enemy_spawns", []))]
@@ -411,6 +426,38 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
 
 def camera_for(player):
     return (max(0, min(WORLD[0] - VIEW[0], round(player.x - VIEW[0] / 2))), max(0, min(WORLD[1] - VIEW[1], round(player.y - VIEW[1] / 2))))
+
+
+def safe_respawn_position(region_id, region, enemies):
+    source = {"forest": "village", "desert": "forest"}.get(region_id)
+    preferred = region.get("spawn", {}).get(source, (1024, 576)) if source else (1024, 576)
+    candidates = [preferred]
+    for distance in (24, 48, 72, 96, 128):
+        candidates.extend((preferred[0] + dx, preferred[1] + dy)
+                          for dx, dy in ((distance, 0), (-distance, 0), (0, distance), (0, -distance)))
+    width, height = region["terrain"].get_size()
+    for x, y in candidates:
+        box = pygame.Rect(round(x - 13), round(y - 9), 26, 18)
+        if not (18 <= x <= width - 18 and 38 <= y <= height - 12):
+            continue
+        if any(box.colliderect(obstacle) for obstacle in region["obstacles"]):
+            continue
+        if any(box.colliderect(enemy.hitbox.inflate(18, 18)) for enemy in enemies if enemy.state != "DEAD"):
+            continue
+        return float(x), float(y)
+    return float(preferred[0]), float(preferred[1])
+
+
+def restore_player_after_death(player, region_id, region, enemies):
+    player.x, player.y = safe_respawn_position(region_id, region, enemies)
+    player.hp, player.sp = player.max_hp, player.max_sp
+    player.attack_timer = player.attack_cooldown_timer = 0
+    player.dash_timer = player.dash_cooldown = player.dash_iframes = 0
+    player.invulnerability_timer = RESPAWN_IFRAMES
+    player.knockback_x = player.knockback_y = 0.0
+    player.knockback_frames = 0
+    player.attack_serial += 1
+    return player.x, player.y
 
 def draw_panel(surface, rect, fill=(35, 43, 50), border=(187, 145, 75), radius=10):
     shadow = rect.move(5, 6)
@@ -702,6 +749,8 @@ def draw_inventory(canvas, inventory, font, title_font, player, ui_state, mouse_
         canvas.blit(label, (action_rect.centerx - label.get_width()//2, action_rect.centery - label.get_height()//2))
 
 def apply_inventory_action(selected, inventory, player, ui_state):
+    if player.hp <= 0:
+        return False, "Não é possível usar itens agora."
     if selected is None or not any(entry is selected for entry in inventory):
         return False, "Selecione um item primeiro."
     kind = inventory_kind(selected)
@@ -718,6 +767,9 @@ def apply_inventory_action(selected, inventory, player, ui_state):
         return True, message
 
     if kind == "consumable":
+        cooldown = ui_state.get("consumable_cooldown", 0)
+        if cooldown > 0:
+            return False, f"Aguarde {cooldown / FPS:.1f}s para usar outro consumível."
         name = selected.get("name")
         definition = CONSUMABLES.get(selected.get("id"), {})
         target, amount = definition.get("resource"), definition.get("restore", 0)
@@ -727,6 +779,7 @@ def apply_inventory_action(selected, inventory, player, ui_state):
             return False, "Vida já está cheia." if target == "hp" else "SP já está cheio."
         restored = min(amount, maximum - current)
         setattr(player, target, current + restored)
+        ui_state["consumable_cooldown"] = CONSUMABLE_COOLDOWN_FRAMES
         selected["amount"] = selected.get("amount", 1) - 1
         if selected["amount"] <= 0:
             del inventory[next(index for index, entry in enumerate(inventory) if entry is selected)]
@@ -763,7 +816,7 @@ def handle_character_click(position, player):
 
 
 def main():
-    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.11")
+    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.12")
     screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
     player = Player(load("assets/player/f_player_sheet.png"), load("assets/player/f_player_attack_sheet.png"))
     current_region = "village"
@@ -777,24 +830,91 @@ def main():
     dialogue = DialogueBox()
     quest_manager = QuestManager()
     opened_desert_chests = set()
-    inventory_ui = {"tab": "TODOS", "selected": None}
+    inventory_ui = {"tab": "TODOS", "selected": None, "consumable_cooldown": 0}
     dialogue.inventory = inventory
     debug = False
     hitstop_frames = 0
+    game_over_screen = None
     autosave_allowed = True
     if save_manager.SAVE_PATH.exists():
         try:
-            save_manager.read_save()
+            save_manager.read_save(save_manager.SAVE_PATH)
         except save_manager.SaveError:
             autosave_allowed = False
             quest_manager.notice = "Save inválido encontrado. Autosave pausado; F5 para substituir."
             quest_manager.notice_timer = 360
+
+    def load_last_save():
+        nonlocal player, inventory, quest_manager, current_region, region, enemies
+        nonlocal drops, opened_desert_chests, damage_numbers, hitstop_frames
+        nonlocal dialogue, ui_mode, inventory_ui, autosave_allowed, game_over_screen
+        try:
+            loaded = save_manager.load_game(
+                save_manager.SAVE_PATH,
+                lambda: Player(player.idle, player.attack_sheet),
+                build_region, spawn_enemies,
+                lambda: Enemy("forest_guardian", (1300, 430), load, seed=77))
+        except save_manager.MissingSaveError:
+            quest_manager.notice = "Nenhum save encontrado."
+            quest_manager.notice_timer = 180
+            return False
+        except save_manager.SaveError:
+            autosave_allowed = False
+            quest_manager.notice = "Save inválido ou corrompido; jogo atual preservado."
+            quest_manager.notice_timer = 180
+            return False
+        player, inventory, quest_manager = loaded.player, loaded.inventory, loaded.quests
+        current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
+        drops, opened_desert_chests = loaded.drops, loaded.opened_chests
+        damage_numbers = []
+        hitstop_frames = 0
+        dialogue.npc = None
+        dialogue.inventory = inventory
+        ui_mode = None
+        inventory_ui = {"tab": "TODOS", "selected": None, "consumable_cooldown": 0}
+        autosave_allowed = True
+        game_over_screen = None
+        quest_manager.notice = "Jogo carregado."
+        quest_manager.notice_timer = 180
+        return True
+
+    def continue_after_death():
+        nonlocal region, enemies, damage_numbers, hitstop_frames, ui_mode
+        nonlocal game_over_screen, inventory_ui
+        if (current_region == "forest" and quest_manager.forest_event_started
+                and not quest_manager.forest_boss_defeated):
+            region, enemies = reset_forest_boss_encounter()
+        restore_player_after_death(player, current_region, region, enemies)
+        player.sp_idle_frames = 0
+        damage_numbers = []
+        hitstop_frames = 0
+        ui_mode = None
+        dialogue.npc = None
+        inventory_ui["consumable_cooldown"] = 0
+        game_over_screen = None
+
     running = True
     while running:
         autosave_pending = False
+        if inventory_ui["consumable_cooldown"] > 0:
+            inventory_ui["consumable_cooldown"] -= 1
+        if game_over_screen is not None:
+            game_over_screen.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif game_over_screen is not None:
+                mouse_position = (logical_mouse_position(event.pos)
+                                  if event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN) else (0, 0))
+                choice = game_over_screen.handle_event(event, mouse_position, VIEW)
+                if choice == "continue":
+                    continue_after_death()
+                elif choice == "load":
+                    load_last_save()
+                    if game_over_screen is not None:
+                        game_over_screen.notice = quest_manager.notice
+                elif choice == "quit":
+                    running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and ui_mode == "character":
                 handle_character_click(logical_mouse_position(event.pos), player)
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and ui_mode == "inventory":
@@ -804,40 +924,20 @@ def main():
                     quest_manager.notice, quest_manager.notice_timer = notice, 150
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_F5:
-                    try:
-                        save_manager.save_game(player, inventory, quest_manager, current_region,
-                                               opened_desert_chests, drops)
-                    except save_manager.SaveError:
-                        quest_manager.notice = "Não foi possível salvar o jogo."
+                    if player.hp <= 0:
+                        quest_manager.notice = "Não é possível salvar após a derrota."
                     else:
-                        autosave_allowed = True
-                        quest_manager.notice = "Jogo salvo."
+                        try:
+                            save_manager.save_game(player, inventory, quest_manager, current_region,
+                                                   opened_desert_chests, drops)
+                        except save_manager.SaveError:
+                            quest_manager.notice = "Não foi possível salvar o jogo."
+                        else:
+                            autosave_allowed = True
+                            quest_manager.notice = "Jogo salvo."
                     quest_manager.notice_timer = 180
                 elif event.key == pygame.K_F9:
-                    try:
-                        loaded = save_manager.load_game(
-                            save_manager.SAVE_PATH,
-                            lambda: Player(player.idle, player.attack_sheet),
-                            build_region, spawn_enemies,
-                            lambda: Enemy("forest_guardian", (1300, 430), load, seed=77))
-                    except save_manager.MissingSaveError:
-                        quest_manager.notice = "Nenhum save encontrado."
-                    except save_manager.SaveError:
-                        autosave_allowed = False
-                        quest_manager.notice = "Save inválido ou corrompido; jogo atual preservado."
-                    else:
-                        player, inventory, quest_manager = loaded.player, loaded.inventory, loaded.quests
-                        current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
-                        drops, opened_desert_chests = loaded.drops, loaded.opened_chests
-                        damage_numbers = []
-                        hitstop_frames = 0
-                        dialogue.npc = None
-                        dialogue.inventory = inventory
-                        ui_mode = None
-                        inventory_ui = {"tab": "TODOS", "selected": None}
-                        autosave_allowed = True
-                        quest_manager.notice = "Jogo carregado."
-                    quest_manager.notice_timer = 180
+                    load_last_save()
                 elif event.key == pygame.K_ESCAPE:
                     if dialogue.active: dialogue.npc = None
                     elif ui_mode is not None: ui_mode = None
@@ -882,9 +982,11 @@ def main():
                     player.attack()
                 elif event.key == pygame.K_q and ui_mode is None and not dialogue.active:
                     player.start_dash(pygame.key.get_pressed())
-        if hitstop_frames > 0:
+        if game_over_screen is not None:
+            pass
+        elif hitstop_frames > 0:
             hitstop_frames -= 1
-        elif ui_mode is None and not dialogue.active:
+        elif ui_mode is None and not dialogue.active and player.hp > 0:
             if current_region == "forest":
                 region["north_locked"] = not quest_manager.forest_boss_defeated
             # O encontro só pode nascer depois da recompensa da primeira quest.
@@ -904,14 +1006,16 @@ def main():
                 hp_before = player.hp
                 enemy.update(player, region["obstacles"])
                 if player.hp < hp_before:
-                    hitstop_frames = max(hitstop_frames, 2 if enemy.attack_action != "charged" else 3)
+                    hitstop_frames = max(hitstop_frames, HITSTOP_STRONG_FRAMES
+                                         if enemy.attack_action == "charged" else HITSTOP_NORMAL_FRAMES)
                     damage_numbers.append(DamageNumber(str(hp_before - player.hp),
                                                        player.x, player.y - 82, (250, 108, 104)))
                 if player.attack_box.colliderect(enemy.hurtbox) and getattr(enemy, "last_player_attack", -1) != player.attack_serial:
                     enemy_hp_before = enemy.hp
                     if enemy.receive_hit(player.current_attack_damage, player.x, player.y,
                                          player.knockback_power):
-                        hitstop_frames = max(hitstop_frames, 3 if player.attack_is_critical else 2)
+                        hitstop_frames = max(hitstop_frames, HITSTOP_STRONG_FRAMES
+                                             if player.attack_is_critical else HITSTOP_NORMAL_FRAMES)
                         enemy.last_player_attack = player.attack_serial
                         damage_numbers.append(DamageNumber(
                             f"{enemy_hp_before - enemy.hp}{'!' if player.attack_is_critical else ''}",
@@ -943,13 +1047,20 @@ def main():
                             quest_manager.notice = "Amuleto da Clareira recebido!"
                             quest_manager.notice_timer = 210
                         autosave_pending = True
+                if player.hp <= 0:
+                    break
             enemies = [enemy for enemy in enemies if enemy.state != "DEAD" or enemy.dead_timer > 0]
+            if player.hp <= 0 and game_over_screen is None:
+                game_over_screen = game_over.GameOverScreen()
+                ui_mode = None
+                dialogue.npc = None
+                hitstop_frames = 0
             drops = [drop for drop in drops if drop.update()]
-            for drop in drops[:]:
+            for drop in drops[:] if player.hp > 0 else []:
                 if player.hitbox.colliderect(drop.hitbox):
                     add_inventory_item(inventory, drop.item)
                     drops.remove(drop)
-            for destination, exit_rect in region["exits"].items():
+            for destination, exit_rect in (region["exits"].items() if player.hp > 0 else ()):
                 if player.hitbox.colliderect(exit_rect):
                     if not can_transition(current_region, destination, quest_manager):
                         quest_manager.notice = "Derrote o Guardião da Clareira para seguir ao norte."
@@ -977,7 +1088,7 @@ def main():
                     player.invulnerability_timer = 30
                     autosave_pending = True
                     break
-        if autosave_pending and autosave_allowed:
+        if autosave_pending and autosave_allowed and player.hp > 0 and game_over_screen is None:
             try:
                 save_manager.save_game(player, inventory, quest_manager, current_region,
                                        opened_desert_chests, drops)
@@ -1010,6 +1121,8 @@ def main():
         elif ui_mode == "inventory":
             mouse_pos = logical_mouse_position(pygame.mouse.get_pos())
             draw_inventory(canvas, inventory, font, title_font, player, inventory_ui, mouse_pos)
+        if game_over_screen is not None:
+            game_over_screen.draw(canvas, font, title_font, logical_mouse_position(pygame.mouse.get_pos()))
         pygame.transform.scale(canvas, WINDOW, screen); pygame.display.flip(); clock.tick(FPS)
     pygame.quit(); return 0
 

@@ -7,7 +7,7 @@ from items import consumable
 
 ENEMY_CONFIGS = {
     "slime": {
-        "name": "Slime", "max_hp": 28, "damage": 5, "speed": 1.45,
+        "name": "Slime", "max_hp": 48, "damage": 4, "speed": 1.45,
         "perception": 245, "attack_range": 48, "cooldown": 62,
         # O spritesheet possui quantidades diferentes por animação:
         # idle = 4, movimento = 6, ataque = 7, dano = 3, morte = 5.
@@ -17,21 +17,21 @@ ENEMY_CONFIGS = {
         "drop": {"id": "herb", "chance": 0.55, "min": 1, "max": 2}, "xp_reward": 18,
     },
     "warrior": {
-        "name": "Guardião Errante", "max_hp": 64, "damage": 9, "speed": 1.55,
+        "name": "Guardião Errante", "max_hp": 96, "damage": 7, "speed": 1.55,
         "perception": 290, "attack_range": 82, "cooldown": 72,
         "frame_size": 192, "scale": 0.65, "hitbox_radius": 23, "idle_frames": 8, "move_frames": 6,
         "attack_frames": 4, "hurt_frames": 1, "death_frames": 1,
         "drop": {"id": "ether", "chance": 0.45, "min": 1, "max": 1}, "xp_reward": 42,
     },
     "forest_guardian": {
-        "name": "Guardião da Clareira", "max_hp": 180, "damage": 18, "speed": 0.9,
+        "name": "Guardião da Clareira", "max_hp": 180, "damage": 12, "speed": 0.9,
         "perception": 420, "attack_range": 92, "cooldown": 26,
         "frame_size": 192, "scale": 1.0, "hitbox_radius": 30, "idle_frames": 8, "move_frames": 6,
         "attack_frames": 4, "hurt_frames": 1, "death_frames": 1,
         "drop": {"id": "ether", "chance": 1.0, "min": 2, "max": 2}, "xp_reward": 180,
     },
     "desert_scout": {
-        "name": "Batedor das Dunas", "max_hp": 82, "damage": 13, "speed": 1.32,
+        "name": "Batedor das Dunas", "max_hp": 82, "damage": 9, "speed": 1.32,
         "perception": 330, "attack_range": 190, "cooldown": 105,
         "frame_size": 192, "scale": 0.58, "hitbox_radius": 21, "idle_frames": 6, "move_frames": 4,
         "attack_frames": 8, "hurt_frames": 1, "death_frames": 1,
@@ -40,7 +40,7 @@ ENEMY_CONFIGS = {
         "drop": {"id": "herb", "chance": 0.50, "min": 1, "max": 2}, "xp_reward": 58,
     },
     "dune_lancer": {
-        "name": "Lanceiro das Ruínas", "max_hp": 112, "damage": 16, "speed": 1.3,
+        "name": "Lanceiro das Ruínas", "max_hp": 112, "damage": 12, "speed": 1.3,
         "perception": 300, "attack_range": 76, "cooldown": 92,
         "frame_size": 320, "scale": 0.42, "hitbox_radius": 25, "idle_frames": 12, "move_frames": 6,
         "attack_frames": 3, "hurt_frames": 1, "death_frames": 1,
@@ -104,7 +104,10 @@ class Enemy:
         self.attack_zone = None
         self.hit_confirmed = False
         self.retreat_timer = 0
+        self.hit_resistance_timer = 0
         self.rng = random.Random(seed + 300)
+        # Leve defasagem inicial evita que grupos comecem o primeiro golpe juntos.
+        self.attack_cooldown = self.rng.randrange(0, 24)
         self.idle_sheet = load(self._path("Idle"))
         self.move_sheet = load(self._path("Run"))
         self.attack_sheet = load(self._path("Attack"))
@@ -262,6 +265,8 @@ class Enemy:
 
     def update(self, player, obstacles):
         self.anim_tick += 1
+        if self.hit_resistance_timer > 0:
+            self.hit_resistance_timer -= 1
         if self.state == "DEAD":
             self.dead_timer -= 1
             return self.dead_timer > 0
@@ -315,14 +320,18 @@ class Enemy:
         return True
 
     def receive_hit(self, damage, from_x, from_y, knockback=1.0):
-        if self.state == "DEAD" or self.hurt_timer > 0: return False
+        if self.state == "DEAD" or self.hurt_timer > 0 or self.hit_resistance_timer > 0: return False
         self.hp = max(0, self.hp - damage)
         angle = math.atan2(self.y - from_y, self.x - from_x)
         special = self.kind == "forest_guardian" and self.state == "ATTACK"
-        force = (0.9 if special else 1.7 if self.kind == "forest_guardian" else 4.0) * knockback
+        force = (0.45 if special else 0.75 if self.kind == "forest_guardian"
+                 else 2.6 if self.kind == "slime" else 1.7) * knockback
         self.knockback_x, self.knockback_y = math.cos(angle) * force, math.sin(angle) * force
+        self.hit_resistance_timer = {"slime": 5, "warrior": 11, "forest_guardian": 13,
+                                     "desert_scout": 8, "dune_lancer": 11}[self.kind]
         if not special:
-            self.hurt_timer = 7 if self.kind == "forest_guardian" else 10
+            self.hurt_timer = {"slime": 9, "warrior": 8, "forest_guardian": 6,
+                               "desert_scout": 7, "dune_lancer": 8}[self.kind]
             self.state = "HURT"
             self.attack_zone = None
             self.attack_phase = self.attack_action = None

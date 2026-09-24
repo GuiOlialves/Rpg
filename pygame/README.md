@@ -1,6 +1,6 @@
 # O Vale — RPG em Pygame
 
-**Versão 0.11** · RPG 2D top-down desenvolvido em Python com Pygame CE.
+**Versão 0.12** · RPG 2D top-down desenvolvido em Python com Pygame CE.
 
 O jogo reúne exploração, combate e progressão em três áreas conectadas: Vila do Vale, Floresta Mística e Deserto das Dunas. A versão inclui inimigos com animações, NPCs e diálogos, uma missão inicial com chefe, equipamentos, inventário, atributos e salvamento da recompensa dos baús do deserto durante a sessão.
 
@@ -30,6 +30,8 @@ python main.py
 | `F9` | Carregar manualmente o save |
 | `F3` | Exibir hitboxes de combate e avisos dos ataques |
 
+Ao chegar a 0 HP, a tela de derrota permite continuar do ponto seguro da região, carregar o último save ou sair. Continuar restaura HP/SP, preserva a progressão e reinicia um encontro ainda não concluído com o Guardião. Não é possível salvar com HP zerado. Consumíveis compartilham uma recarga de 1,5 segundo.
+
 ## Estrutura
 
 - `main.py`: janela, personagem, loop principal e interface.
@@ -47,8 +49,8 @@ Os sprites são mantidos separados do código-fonte e preservam a estrutura de p
 
 ## Estado do projeto
 
-A versão 0.11 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
+A versão 0.12 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
 
 Os quatro atributos afetam HP, SP, ataque, defesa, poder mágico, velocidade, cadência e crítico. O menu `V` mostra os bônus de equipamento, os stats de combate e a prévia de cada ponto ao passar o mouse sobre `+`.
 
-O Dash percorre até 99 pixels em 11 frames, tem 6 frames iniciais de esquiva e 39 frames de recarga. O SP começa a regenerar lentamente após três segundos sem gasto (1 ponto a cada 45 frames); Éter continua recuperando SP imediatamente.
+O combate foi ajustado para reduzir dano explosivo e permitir recuperação entre golpes. O Dash percorre até 99 pixels em 11 frames, custa 10 SP, tem 6 frames iniciais de esquiva e 39 frames de recarga. O SP começa a regenerar após quatro segundos sem gasto (1 ponto por segundo); Éter recupera SP imediatamente, respeitando a recarga global de consumíveis.
