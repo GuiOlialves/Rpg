@@ -763,7 +763,7 @@ def handle_character_click(position, player):
 
 
 def main():
-    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.1")
+    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.11")
     screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
     player = Player(load("assets/player/f_player_sheet.png"), load("assets/player/f_player_attack_sheet.png"))
     current_region = "village"
