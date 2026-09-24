@@ -220,11 +220,11 @@ class Enemy:
             if not self._move(self.wander_dx * self.speed * 0.55, self.wander_dy * self.speed * 0.55, obstacles): self._choose_wander()
         return True
 
-    def receive_hit(self, damage, from_x, from_y):
+    def receive_hit(self, damage, from_x, from_y, knockback=1.0):
         if self.state == "DEAD" or self.hurt_timer > 0: return False
         self.hp = max(0, self.hp - damage)
         angle = math.atan2(self.y - from_y, self.x - from_x)
-        force = 1.5 if self.kind == "forest_guardian" else 5
+        force = (1.5 if self.kind == "forest_guardian" else 5) * knockback
         self.knockback_x, self.knockback_y = math.cos(angle) * force, math.sin(angle) * force
         self.hurt_timer = 12
         self.state = "HURT"

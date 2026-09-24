@@ -276,7 +276,7 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
     player.xp_to_next_level = character["xp_to_next_level"]
     player.stat_points = character["stat_points"]
     player.equipment = {slot: by_id.get(item_id) for slot, item_id in data["equipment"].items()}
-    player.recalculate_derived()
+    player.recalculate_stats()
     if character["hp"] > player.max_hp or character["sp"] > player.max_sp:
         raise SaveError("Save inválido: HP ou SP excede o máximo calculado.")
     player.hp, player.sp = character["hp"], character["sp"]

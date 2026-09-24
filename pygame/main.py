@@ -1,8 +1,10 @@
 """Vila de treino - Pygame com câmera, terreno próprio, decoração e colisões."""
 from pathlib import Path
 import math
+import random
 import sys
 import pygame
+import attributes
 import village
 import forest
 import desert
@@ -23,8 +25,6 @@ WORLD = (2048, 1152)
 TILE = 32
 FPS = 60
 STAT_POINTS_PER_LEVEL = 3
-BASE_HP, HP_PER_VITALITY = 80, 2
-BASE_SP, SP_PER_MAGIC = 48, 2
 
 def load(path: str) -> pygame.Surface:
     return pygame.image.load(ROOT / path).convert_alpha()
@@ -80,34 +80,51 @@ class Player:
         self.x, self.y = 1024.0, 576.0
         self.facing = 0
         self.walk_frame = self.walk_timer = self.attack_timer = 0
+        self.attack_cooldown_timer = 0
+        self.attack_is_critical = False
         self.speed = 3.0
         self.max_hp, self.hp = 100, 100
         self.max_sp, self.sp = 60, 60
         self.stats = {"vitalidade": 10, "força": 8, "magia": 6, "agilidade": 9}
         self.level, self.current_xp, self.xp_to_next_level, self.stat_points = 1, 0, 100, 0
         self.equipment = {slot: None for slot in SLOTS}
+        self.modifiers = {}  # espaço para buffs e debuffs futuros
         self.invulnerability_timer = 0
         self.attack_serial = 0
-        self.recalculate_derived()
+        self.recalculate_stats()
 
-    def recalculate_derived(self):
-        self.final_stats = dict(self.stats)
-        for equipped in self.equipment.values():
-            if equipped:
-                for key, value in equipped.get("bonuses", {}).items(): self.final_stats[key] = self.final_stats.get(key, 0) + value
-        old_hp, old_sp = getattr(self, "max_hp", BASE_HP), getattr(self, "max_sp", BASE_SP)
-        self.max_hp = BASE_HP + self.final_stats["vitalidade"] * HP_PER_VITALITY
-        self.max_sp = BASE_SP + self.final_stats["magia"] * SP_PER_MAGIC
+    def recalculate_stats(self):
+        old_hp, old_sp = self.max_hp, self.max_sp
+        self.final_stats, self.equipment_bonus, self.derived = attributes.calculate(
+            self.stats, self.equipment, self.modifiers)
+        self.max_hp, self.max_sp = self.derived["max_hp"], self.derived["max_sp"]
         self.hp = min(self.max_hp, self.hp + max(0, self.max_hp - old_hp))
         self.sp = min(self.max_sp, self.sp + max(0, self.max_sp - old_sp))
-        self.speed = 3.0 + min(0.35, self.final_stats["agilidade"] * 0.02)
+        self.speed = self.derived["move_speed"]
+        self.physical_attack = self.derived["physical_attack"]
+        self.magic_power = self.derived["magic_power"]
+        self.defense = self.derived["defense"]
+        self.attack_cooldown_frames = self.derived["attack_cooldown"]
+        self.crit_chance = self.derived["crit_chance"]
+        self.crit_multiplier = self.derived["crit_multiplier"]
+        self.knockback_power = self.derived["knockback_power"]
+
+    def recalculate_derived(self):
+        self.recalculate_stats()
+
+    def preview_stat(self, name):
+        if name not in self.stats or self.stat_points <= 0:
+            return None
+        preview = dict(self.stats)
+        preview[name] += 1
+        return attributes.calculate(preview, self.equipment, self.modifiers)[2]
 
     def equip(self, equipment):
         old = self.equipment.get(equipment["slot"]); self.equipment[equipment["slot"]] = equipment
-        self.recalculate_derived(); return old
+        self.recalculate_stats(); return old
 
     def unequip(self, slot):
-        old = self.equipment.get(slot); self.equipment[slot] = None; self.recalculate_derived(); return old
+        old = self.equipment.get(slot); self.equipment[slot] = None; self.recalculate_stats(); return old
 
     def xp_required(self, level=None):
         return 100 + ((level or self.level) - 1) * 55
@@ -117,12 +134,12 @@ class Player:
         while self.current_xp >= self.xp_to_next_level:
             self.current_xp -= self.xp_to_next_level; self.level += 1
             self.stat_points += STAT_POINTS_PER_LEVEL; self.xp_to_next_level = self.xp_required(); levels += 1
-        if levels: self.recalculate_derived(); self.hp, self.sp = self.max_hp, self.max_sp
+        if levels: self.recalculate_stats(); self.hp, self.sp = self.max_hp, self.max_sp
         return levels
 
     def spend_stat(self, name):
         if self.stat_points <= 0 or name not in self.stats: return False
-        self.stat_points -= 1; self.stats[name] += 1; self.recalculate_derived(); return True
+        self.stat_points -= 1; self.stats[name] += 1; self.recalculate_stats(); return True
 
     @property
     def hitbox(self):
@@ -131,6 +148,8 @@ class Player:
     def update(self, keys, obstacles):
         if self.invulnerability_timer > 0:
             self.invulnerability_timer -= 1
+        if self.attack_cooldown_timer > 0:
+            self.attack_cooldown_timer -= 1
         if self.attack_timer > 0:
             self.attack_timer -= 1
             return
@@ -154,13 +173,21 @@ class Player:
             self.x -= dx; self.y -= dy
 
     def attack(self):
-        if self.attack_timer <= 0:
-            self.attack_timer = 14
+        if self.attack_timer <= 0 and self.attack_cooldown_timer <= 0:
+            self.attack_timer = attributes.ATTACK_ANIMATION_FRAMES
+            self.attack_cooldown_timer = self.attack_cooldown_frames
             self.attack_serial += 1
+            self.attack_is_critical = random.random() < self.crit_chance
+            return True
+        return False
 
     @property
     def attack_damage(self):
-        return 8 + self.final_stats["força"] * 2
+        return self.physical_attack
+
+    @property
+    def current_attack_damage(self):
+        return round(self.attack_damage * self.crit_multiplier) if self.attack_is_critical else self.attack_damage
 
     @property
     def attack_box(self):
@@ -175,7 +202,7 @@ class Player:
     def take_damage(self, amount):
         if self.invulnerability_timer > 0 or self.hp <= 0:
             return False
-        reduced = max(1, amount - self.final_stats["vitalidade"] // 5)
+        reduced = attributes.physical_damage_after_defense(amount, self.defense)
         self.hp = max(0, self.hp - reduced)
         self.invulnerability_timer = 48
         return True
@@ -185,6 +212,24 @@ class Player:
         sprite = pygame.transform.scale(frame(self.attack_sheet if self.attack_timer else self.idle, index, self.facing), (96, 96))
         if self.invulnerability_timer == 0 or (self.invulnerability_timer // 4) % 2 == 0:
             canvas.blit(sprite, (round(self.x - 48 - camera[0]), round(self.y - 72 - camera[1])))
+
+
+class DamageNumber:
+    def __init__(self, text, x, y, color, critical=False):
+        self.text, self.x, self.y = text, x, y
+        self.color, self.critical = color, critical
+        self.ticks = 42
+
+    def update(self):
+        self.y -= 0.65
+        self.ticks -= 1
+        return self.ticks > 0
+
+    def draw(self, canvas, camera, font, title_font):
+        label = (title_font if self.critical else font).render(self.text, True, self.color)
+        label.set_alpha(min(255, self.ticks * 12))
+        canvas.blit(label, (round(self.x - camera[0] - label.get_width() / 2),
+                            round(self.y - camera[1])))
 
 def build_village():
     houses, objects, nature, obstacles = village.build(asset, make_flowerbed, make_fountain, make_sign, make_bush,load)
@@ -346,7 +391,38 @@ def wrap_text(text, font, max_width, max_lines=3):
     if current: lines.append(current)
     return [fit_text(line, font, max_width) for line in lines[:max_lines]]
 
-def draw_character_menu(canvas, player, font, title_font):
+def character_attribute_layout():
+    stats = (("Vitalidade", "vitalidade", (198, 85, 85)),
+             ("Força", "força", (214, 143, 69)),
+             ("Magia", "magia", (111, 128, 220)),
+             ("Agilidade", "agilidade", (84, 177, 113)))
+    return [(label, key, color, pygame.Rect(355, 205 + index * 30, 577, 27),
+             pygame.Rect(895, 207 + index * 30, 32, 23))
+            for index, (label, key, color) in enumerate(stats)]
+
+
+def attribute_preview_lines(player, key):
+    next_stats = player.preview_stat(key)
+    if next_stats is None:
+        return ["Sem pontos disponíveis."]
+    now = player.derived
+    if key == "vitalidade":
+        return [f"HP máx.: {now['max_hp']} → {next_stats['max_hp']}",
+                f"Defesa: {now['defense']:.1f} → {next_stats['defense']:.1f}"]
+    if key == "força":
+        return [f"Ataque: {now['physical_attack']} → {next_stats['physical_attack']}",
+                f"Empurrão: {now['knockback_power']:.2f}x → {next_stats['knockback_power']:.2f}x"]
+    if key == "magia":
+        return [f"SP máx.: {now['max_sp']} → {next_stats['max_sp']}",
+                f"Poder mágico: {now['magic_power']} → {next_stats['magic_power']}"]
+    cadence = (f"Cadência: {now['attack_cooldown']} → {next_stats['attack_cooldown']} frames"
+               if now["attack_cooldown"] != next_stats["attack_cooldown"] else
+               f"Cadência: {now['attack_cooldown']} frames (sem mudança)")
+    return [f"Movimento: {now['move_speed']/attributes.BASE_MOVE_SPEED:.1%} → {next_stats['move_speed']/attributes.BASE_MOVE_SPEED:.1%}",
+            cadence, f"Crítico: {now['crit_chance']:.1%} → {next_stats['crit_chance']:.1%}"]
+
+
+def draw_character_menu(canvas, player, font, title_font, mouse_pos=(-1, -1)):
     shade = pygame.Surface(VIEW, pygame.SRCALPHA); shade.fill((5, 9, 12, 155)); canvas.blit(shade, (0, 0))
     panel = pygame.Rect(72, 28, 880, 520)
     draw_panel(canvas, panel, fill=(35, 43, 50), radius=13)
@@ -374,30 +450,72 @@ def draw_character_menu(canvas, player, font, title_font):
     right_x, right_w = 355, 577
     draw_bar(canvas, pygame.Rect(right_x, 104, right_w, 31), player.hp, player.max_hp, (185, 51, 62), "HP", font)
     draw_bar(canvas, pygame.Rect(right_x, 143, right_w, 31), player.sp, player.max_sp, (54, 112, 196), "SP", font)
-    canvas.blit(title_font.render("ATRIBUTOS", True, (248, 224, 165)), (right_x, 182))
-    stats = [("Vitalidade", "vitalidade", (198, 85, 85)), ("Força", "força", (214, 143, 69)), ("Magia", "magia", (111, 128, 220)), ("Agilidade", "agilidade", (84, 177, 113))]
-    for i, (label, key, color) in enumerate(stats):
-        y = 210 + i * 39; value = player.final_stats[key]
-        row = pygame.Rect(right_x, y, right_w, 33)
-        pygame.draw.rect(canvas, (27, 34, 40), row, border_radius=6); pygame.draw.rect(canvas, (72, 82, 86), row, 1, border_radius=6)
+    canvas.blit(title_font.render("ATRIBUTOS", True, (248, 224, 165)), (right_x, 178))
+    hovered_attribute = None
+    for i, (label, key, color, row, plus) in enumerate(character_attribute_layout()):
+        value = player.final_stats[key]
+        hover = row.collidepoint(mouse_pos)
+        pygame.draw.rect(canvas, (40, 51, 56) if hover else (27, 34, 40), row, border_radius=6)
+        pygame.draw.rect(canvas, (102, 112, 105) if hover else (72, 82, 86), row, 1, border_radius=6)
         pygame.draw.circle(canvas, color, (row.x + 16, row.centery), 6)
-        canvas.blit(font.render(label, True, "white"), (row.x + 30, row.y + 8))
-        track = pygame.Rect(row.x + 155, row.y + 9, 300, 15); pygame.draw.rect(canvas, (17, 22, 26), track, border_radius=4)
-        pygame.draw.rect(canvas, color, (track.x, track.y, min(track.width, value * 10), track.height), border_radius=4)
-        value_text = font.render(f"{value}  [{i+1}] +", True, (248, 224, 165))
-        canvas.blit(value_text, (row.right - value_text.get_width() - 10, row.y + 8))
-    canvas.blit(font.render(f"Pontos disponíveis: {player.stat_points}  |  Teclas 1-4 distribuem", True, (248, 224, 165)), (right_x, 370))
+        canvas.blit(font.render(label, True, "white"), (row.x + 30, row.y + 5))
+        track = pygame.Rect(row.x + 155, row.y + 9, 210, 10)
+        pygame.draw.rect(canvas, (17, 22, 26), track, border_radius=4)
+        pygame.draw.rect(canvas, color, (track.x, track.y, min(track.width, value * 6), track.height), border_radius=4)
+        bonus = player.equipment_bonus[key]
+        value_label = f"{value} (+{bonus})" if bonus else str(value)
+        value_text = font.render(value_label, True, (248, 224, 165))
+        canvas.blit(value_text, (plus.x - value_text.get_width() - 10, row.y + 5))
+        enabled = player.stat_points > 0
+        pygame.draw.rect(canvas, (184, 145, 74) if enabled and plus.collidepoint(mouse_pos)
+                         else (130, 102, 59) if enabled else (66, 73, 74), plus, border_radius=5)
+        glyph = font.render("+", True, "white" if enabled else (141, 148, 148))
+        canvas.blit(glyph, (plus.centerx - glyph.get_width() // 2, plus.y + 3))
+        if hover:
+            hovered_attribute = (label, key, plus.collidepoint(mouse_pos))
+    canvas.blit(font.render(f"Pontos: {player.stat_points}   •   Clique em + ou use 1–4", True, (248, 224, 165)), (right_x, 331))
 
-    equip = pygame.Rect(right_x, 397, right_w, 131)
+    canvas.blit(title_font.render("STATS DE COMBATE", True, (248, 224, 165)), (right_x, 351))
+    combat = (("ATAQUE", str(player.physical_attack)), ("DEFESA", f"{player.defense:.1f}"),
+              ("CRÍTICO", f"{player.crit_chance:.1%}"),
+              ("VELOCIDADE", f"{player.speed/attributes.BASE_MOVE_SPEED:.0%}"),
+              ("HP MÁX.", str(player.max_hp)), ("SP MÁX.", str(player.max_sp)),
+              ("PODER MÁGICO", str(player.magic_power)),
+              ("CADÊNCIA", f"{player.attack_cooldown_frames} frames"))
+    for index, (label, value) in enumerate(combat):
+        col, row = index % 2, index // 2
+        x, y = right_x + col * 288, 379 + row * 18
+        canvas.blit(font.render(label, True, (163, 180, 178)), (x, y))
+        value_text = font.render(value, True, (244, 226, 176))
+        canvas.blit(value_text, (x + 275 - value_text.get_width(), y))
+
+    equip = pygame.Rect(right_x, 450, right_w, 78)
     pygame.draw.rect(canvas, (25, 32, 38), equip, border_radius=8); pygame.draw.rect(canvas, (82, 94, 98), equip, 1, border_radius=8)
-    canvas.blit(title_font.render("EQUIPAMENTOS", True, (248, 224, 165)), (equip.x + 14, equip.y + 8))
+    canvas.blit(font.render("EQUIPAMENTOS", True, (248, 224, 165)), (equip.x + 12, equip.y + 5))
     for i, slot in enumerate(SLOTS):
         entry = player.equipment.get(slot)
         label = f"{slot}: {(entry or {}).get('name', 'Nenhum')}"
         if entry and entry.get("bonuses"):
             label += "  " + "  ".join(f"+{amount} {key.title()}" for key, amount in entry["bonuses"].items())
         text = font.render(fit_text(label, font, equip.width - 28), True, (220, 224, 215))
-        canvas.blit(text, (equip.x + 14, equip.y + 39 + i * 27))
+        canvas.blit(text, (equip.x + 12, equip.y + 24 + i * 17))
+
+    if hovered_attribute:
+        label, key, on_plus = hovered_attribute
+        descriptions = {"vitalidade": "Aumenta HP máximo e Defesa.",
+                        "força": "Aumenta dano físico e empurrão.",
+                        "magia": "Aumenta SP e Poder Mágico.",
+                        "agilidade": "Aumenta movimento, cadência e crítico."}
+        lines = attribute_preview_lines(player, key) if on_plus else [descriptions[key]]
+        tooltip = pygame.Rect(min(mouse_pos[0] + 15, VIEW[0] - 340),
+                              min(mouse_pos[1] + 14, VIEW[1] - 36 - len(lines) * 20),
+                              324, 30 + len(lines) * 20)
+        pygame.draw.rect(canvas, (18, 27, 32), tooltip, border_radius=7)
+        pygame.draw.rect(canvas, (187, 145, 75), tooltip, 2, border_radius=7)
+        canvas.blit(font.render(label.upper() + (" • PRÓXIMO PONTO" if on_plus else ""),
+                                True, (248, 224, 165)), (tooltip.x + 10, tooltip.y + 6))
+        for index, line in enumerate(lines):
+            canvas.blit(font.render(line, True, (226, 231, 218)), (tooltip.x + 10, tooltip.y + 27 + index * 20))
 
 def inventory_kind(item):
     if item.get("type") == "equipment" or item.get("slot"): return "equipment"
@@ -556,6 +674,14 @@ def handle_inventory_click(pos, inventory, player, ui_state):
 def logical_mouse_position(position):
     return (position[0] * VIEW[0] // WINDOW[0], position[1] * VIEW[1] // WINDOW[1])
 
+
+def handle_character_click(position, player):
+    for _, key, _, _, plus in character_attribute_layout():
+        if plus.collidepoint(position):
+            return player.spend_stat(key)
+    return False
+
+
 def main():
     pygame.init(); pygame.display.set_caption("O Vale RPG | v0.1")
     screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
@@ -564,6 +690,7 @@ def main():
     region = build_region(current_region)
     enemies = spawn_enemies(region)
     drops = []
+    damage_numbers = []
     font = pygame.font.Font(None, 22); title_font = pygame.font.Font(None, 30)
     inventory = [consumable("potion", 3), consumable("ether", 2), consumable("herb", 5), item("iron_blade"), item("reinforced_leather")]
     ui_mode = None
@@ -587,6 +714,8 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and ui_mode == "character":
+                handle_character_click(logical_mouse_position(event.pos), player)
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and ui_mode == "inventory":
                 result = handle_inventory_click(logical_mouse_position(event.pos), inventory, player, inventory_ui)
                 if result:
@@ -619,6 +748,7 @@ def main():
                         player, inventory, quest_manager = loaded.player, loaded.inventory, loaded.quests
                         current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
                         drops, opened_desert_chests = loaded.drops, loaded.opened_chests
+                        damage_numbers = []
                         dialogue.npc = None
                         dialogue.inventory = inventory
                         ui_mode = None
@@ -685,10 +815,21 @@ def main():
                 enemies = [e for e in enemies if e.kind == "forest_guardian" or e.state != "DEAD"]
             player.update(pygame.key.get_pressed(), region["obstacles"])
             for enemy in enemies:
+                hp_before = player.hp
                 enemy.update(player, region["obstacles"])
+                if player.hp < hp_before:
+                    damage_numbers.append(DamageNumber(str(hp_before - player.hp),
+                                                       player.x, player.y - 82, (250, 108, 104)))
                 if player.attack_box.colliderect(enemy.hurtbox) and getattr(enemy, "last_player_attack", -1) != player.attack_serial:
-                    if enemy.receive_hit(player.attack_damage, player.x, player.y):
+                    enemy_hp_before = enemy.hp
+                    if enemy.receive_hit(player.current_attack_damage, player.x, player.y,
+                                         player.knockback_power):
                         enemy.last_player_attack = player.attack_serial
+                        damage_numbers.append(DamageNumber(
+                            f"{enemy_hp_before - enemy.hp}{'!' if player.attack_is_critical else ''}",
+                            enemy.x, enemy.y - enemy.config["frame_size"] * enemy.config["scale"] * 0.8,
+                            (255, 210, 103) if player.attack_is_critical
+                            else (238, 239, 223), player.attack_is_critical))
                 new_drop = enemy.drop()
                 if new_drop is not None:
                     drops.append(new_drop)
@@ -740,8 +881,10 @@ def main():
                         build_region, spawn_enemies,
                         lambda: Enemy("forest_guardian", (1300, 430), load, seed=77))
                     drops = []
+                    damage_numbers = []
                     player.x, player.y = region["spawn"].get(previous_region, (1024, 576))
                     player.attack_timer = 0
+                    player.attack_cooldown_timer = 0
                     player.invulnerability_timer = 30
                     autosave_pending = True
                     break
@@ -754,6 +897,9 @@ def main():
         camera = camera_for(player)
         quest_manager.update()
         draw_world(canvas, region, font, camera, player, enemies, drops, debug)
+        damage_numbers = [number for number in damage_numbers if number.update()]
+        for number in damage_numbers:
+            number.draw(canvas, camera, font, title_font)
         draw_hud(canvas, player, font)
         dialogue.draw(canvas, font, title_font)
         quest_text = quest_manager.active_text()
@@ -769,7 +915,8 @@ def main():
             pygame.draw.rect(canvas, (235, 207, 142), bar, 2, border_radius=5)
             canvas.blit(font.render(f"{boss.name}  {boss.hp}/{boss.max_hp}", True, "white"), (bar.x + 10, bar.y + 3))
         if ui_mode == "character":
-            draw_character_menu(canvas, player, font, title_font)
+            draw_character_menu(canvas, player, font, title_font,
+                                logical_mouse_position(pygame.mouse.get_pos()))
         elif ui_mode == "inventory":
             mouse_pos = logical_mouse_position(pygame.mouse.get_pos())
             draw_inventory(canvas, inventory, font, title_font, player, inventory_ui, mouse_pos)

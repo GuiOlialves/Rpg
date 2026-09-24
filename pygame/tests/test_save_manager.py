@@ -80,13 +80,17 @@ class SaveLoadTests(unittest.TestCase):
 
         expected = (player.level, player.current_xp, player.xp_to_next_level,
                     player.stat_points, dict(player.stats), player.hp, player.sp,
-                    dict(player.final_stats), player.attack_damage, player.speed)
+                    dict(player.final_stats), player.attack_damage, player.speed,
+                    player.defense, player.magic_power, player.crit_chance,
+                    player.attack_cooldown_frames)
         for _ in range(2):
             loaded = self.load()  # novo Player, QuestManager e mapa; como após reiniciar
             restored = loaded.player
             self.assertEqual((restored.level, restored.current_xp, restored.xp_to_next_level,
                               restored.stat_points, restored.stats, restored.hp, restored.sp,
-                              restored.final_stats, restored.attack_damage, restored.speed), expected)
+                              restored.final_stats, restored.attack_damage, restored.speed,
+                              restored.defense, restored.magic_power, restored.crit_chance,
+                              restored.attack_cooldown_frames), expected)
             self.assertEqual(loaded.region_id, "desert")
             self.assertEqual((restored.x, restored.y), (1025, 105))
             self.assertEqual({entry["id"]: entry.get("amount", 1) for entry in loaded.inventory}["potion"], 2)
