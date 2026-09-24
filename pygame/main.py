@@ -554,7 +554,7 @@ def logical_mouse_position(position):
     return (position[0] * VIEW[0] // WINDOW[0], position[1] * VIEW[1] // WINDOW[1])
 
 def main():
-    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.5")
+    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.1")
     screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
     player = Player(load("assets/player/f_player_sheet.png"), load("assets/player/f_player_attack_sheet.png"))
     current_region = "village"
