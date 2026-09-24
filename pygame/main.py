@@ -25,6 +25,13 @@ WORLD = (2048, 1152)
 TILE = 32
 FPS = 60
 STAT_POINTS_PER_LEVEL = 3
+DASH_SP_COST = 10
+DASH_FRAMES = 11
+DASH_SPEED = 9.0
+DASH_COOLDOWN_FRAMES = 39
+DASH_IFRAMES = 6
+SP_REGEN_DELAY = 180
+SP_REGEN_INTERVAL = 45
 
 def load(path: str) -> pygame.Surface:
     return pygame.image.load(ROOT / path).convert_alpha()
@@ -90,6 +97,12 @@ class Player:
         self.equipment = {slot: None for slot in SLOTS}
         self.modifiers = {}  # espaço para buffs e debuffs futuros
         self.invulnerability_timer = 0
+        self.dash_timer = self.dash_cooldown = self.dash_iframes = 0
+        self.dash_dx = self.dash_dy = 0.0
+        self.dash_trail = []
+        self.sp_idle_frames = 0
+        self.knockback_x = self.knockback_y = 0.0
+        self.knockback_frames = 0
         self.attack_serial = 0
         self.recalculate_stats()
 
@@ -150,6 +163,27 @@ class Player:
             self.invulnerability_timer -= 1
         if self.attack_cooldown_timer > 0:
             self.attack_cooldown_timer -= 1
+        if self.dash_cooldown > 0: self.dash_cooldown -= 1
+        if self.dash_iframes > 0: self.dash_iframes -= 1
+        self.dash_trail = [(x, y, age - 1) for x, y, age in self.dash_trail if age > 1]
+        self.sp_idle_frames += 1
+        if self.sp_idle_frames >= SP_REGEN_DELAY and (self.sp_idle_frames - SP_REGEN_DELAY) % SP_REGEN_INTERVAL == 0:
+            self.sp = min(self.max_sp, self.sp + 1)
+        if self.knockback_frames > 0:
+            self._move(self.knockback_x, 0, obstacles); self._move(0, self.knockback_y, obstacles)
+            self.knockback_x *= 0.67; self.knockback_y *= 0.67
+            self.knockback_frames -= 1
+        if self.dash_timer > 0:
+            self.dash_timer -= 1
+            old_position = (self.x, self.y)
+            horizontal_ok = self._move(self.dash_dx * DASH_SPEED, 0, obstacles)
+            vertical_ok = self._move(0, self.dash_dy * DASH_SPEED, obstacles)
+            self._clamp_world()
+            if not horizontal_ok or not vertical_ok or (self.x, self.y) == old_position:
+                self.dash_timer = 0
+                self.dash_iframes = 0
+            else: self.dash_trail.append((*old_position, 7))
+            return
         if self.attack_timer > 0:
             self.attack_timer -= 1
             return
@@ -161,7 +195,7 @@ class Player:
         length = math.hypot(mx, my)
         dx, dy = mx / length * self.speed, my / length * self.speed
         self._move(dx, 0, obstacles); self._move(0, dy, obstacles)
-        self.x = max(18, min(WORLD[0] - 18, self.x)); self.y = max(38, min(WORLD[1] - 12, self.y))
+        self._clamp_world()
         self.facing = 2 if abs(mx) > abs(my) and mx > 0 else 1 if abs(mx) > abs(my) else 0 if my > 0 else 3
         self.walk_timer += 1
         if self.walk_timer >= 8:
@@ -171,9 +205,34 @@ class Player:
         self.x += dx; self.y += dy
         if any(self.hitbox.colliderect(rect) for rect in obstacles):
             self.x -= dx; self.y -= dy
+            return False
+        return True
+
+    def _clamp_world(self):
+        self.x = max(18, min(WORLD[0] - 18, self.x))
+        self.y = max(38, min(WORLD[1] - 12, self.y))
+
+    def start_dash(self, keys):
+        if self.hp <= 0 or self.dash_timer or self.dash_cooldown or self.sp < DASH_SP_COST:
+            return False
+        mx = int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_LEFT])
+        my = int(keys[pygame.K_s] or keys[pygame.K_DOWN]) - int(keys[pygame.K_w] or keys[pygame.K_UP])
+        if not (mx or my):
+            mx, my = {0: (0, 1), 1: (-1, 0), 2: (1, 0), 3: (0, -1)}[self.facing]
+        length = math.hypot(mx, my)
+        self.dash_dx, self.dash_dy = mx / length, my / length
+        self.facing = 2 if abs(mx) > abs(my) and mx > 0 else 1 if abs(mx) > abs(my) else 0 if my > 0 else 3
+        self.sp -= DASH_SP_COST
+        self.sp_idle_frames = 0
+        self.dash_timer = DASH_FRAMES
+        # update() roda no mesmo frame do KEYDOWN; +1 preserva seis frames úteis.
+        self.dash_iframes = DASH_IFRAMES + 1
+        self.dash_cooldown = DASH_COOLDOWN_FRAMES
+        self.attack_timer = 0
+        return True
 
     def attack(self):
-        if self.attack_timer <= 0 and self.attack_cooldown_timer <= 0:
+        if self.hp > 0 and self.dash_timer <= 0 and self.attack_timer <= 0 and self.attack_cooldown_timer <= 0:
             self.attack_timer = attributes.ATTACK_ANIMATION_FRAMES
             self.attack_cooldown_timer = self.attack_cooldown_frames
             self.attack_serial += 1
@@ -191,26 +250,35 @@ class Player:
 
     @property
     def attack_box(self):
-        if self.attack_timer <= 0:
+        if not 3 <= self.attack_timer <= 12:
             return pygame.Rect(0, 0, 0, 0)
-        reach = 62
-        if self.facing == 1: return pygame.Rect(round(self.x - reach - 32), round(self.y - 35), reach, 52)
-        if self.facing == 2: return pygame.Rect(round(self.x + 24), round(self.y - 35), reach, 52)
+        reach = 52
+        if self.facing == 1: return pygame.Rect(round(self.x - reach - 18), round(self.y - 35), reach, 52)
+        if self.facing == 2: return pygame.Rect(round(self.x + 18), round(self.y - 35), reach, 52)
         if self.facing == 3: return pygame.Rect(round(self.x - 25), round(self.y - reach - 18), 50, reach)
         return pygame.Rect(round(self.x - 25), round(self.y + 17), 50, reach)
 
-    def take_damage(self, amount):
-        if self.invulnerability_timer > 0 or self.hp <= 0:
+    def take_damage(self, amount, from_x=None, from_y=None, knockback=1.0):
+        if self.invulnerability_timer > 0 or self.dash_iframes > 0 or self.hp <= 0:
             return False
         reduced = attributes.physical_damage_after_defense(amount, self.defense)
         self.hp = max(0, self.hp - reduced)
         self.invulnerability_timer = 48
+        if from_x is not None and from_y is not None:
+            length = max(1.0, math.hypot(self.x - from_x, self.y - from_y))
+            self.knockback_x = (self.x - from_x) / length * 3.8 * knockback
+            self.knockback_y = (self.y - from_y) / length * 3.8 * knockback
+            self.knockback_frames = 7
         return True
 
     def draw(self, canvas, camera):
         index = max(0, min(7, (16 - self.attack_timer) // 2)) if self.attack_timer else self.walk_frame
         sprite = pygame.transform.scale(frame(self.attack_sheet if self.attack_timer else self.idle, index, self.facing), (96, 96))
+        for trail_x, trail_y, age in self.dash_trail[-4:]:
+            ghost = sprite.copy(); ghost.set_alpha(age * 20)
+            canvas.blit(ghost, (round(trail_x - 48 - camera[0]), round(trail_y - 72 - camera[1])))
         if self.invulnerability_timer == 0 or (self.invulnerability_timer // 4) % 2 == 0:
+            if self.dash_timer > 0: sprite.set_alpha(195)
             canvas.blit(sprite, (round(self.x - 48 - camera[0]), round(self.y - 72 - camera[1])))
 
 
@@ -296,9 +364,21 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
             canvas.blit(image, (pos[0] - camera[0], pos[1] - camera[1]))
     ambient.draw(canvas,region,camera,pygame.time.get_ticks())
     if debug:
+        if player is not None:
+            pygame.draw.rect(canvas, (75, 231, 247), player.hitbox.move(-camera[0], -camera[1]), 2)
+            if player.attack_box.width:
+                pygame.draw.rect(canvas, (255, 250, 112), player.attack_box.move(-camera[0], -camera[1]), 2)
         for enemy in enemies or []:
             pygame.draw.rect(canvas, (235, 75, 75), enemy.hitbox.move(-camera[0], -camera[1]), 1)
             pygame.draw.rect(canvas, (245, 220, 90), enemy.hurtbox.move(-camera[0], -camera[1]), 1)
+            if enemy.attack_box().width:
+                pygame.draw.rect(canvas, (255, 84, 83), enemy.attack_box().move(-camera[0], -camera[1]), 2)
+            if enemy.attack_action == "aoe" and enemy.attack_phase == "windup":
+                pygame.draw.circle(canvas, (255, 84, 83), (round(enemy.x - camera[0]), round(enemy.y - camera[1])), 65, 1)
+            if enemy.attack_action == "charge" and enemy.attack_phase == "windup":
+                dx, dy = enemy.attack_direction
+                pygame.draw.line(canvas, (255, 84, 83), (round(enemy.x - camera[0]), round(enemy.y - camera[1])),
+                                 (round(enemy.x + dx * 168 - camera[0]), round(enemy.y + dy * 168 - camera[1])), 2)
             pygame.draw.circle(canvas, (240, 145, 70), (round(enemy.spawn_x - camera[0]), round(enemy.spawn_y - camera[1])), 4, 1)
             debug_text = font.render(enemy.state, True, (255, 230, 120))
             canvas.blit(debug_text, (round(enemy.x - camera[0] - 25), round(enemy.y - camera[1] - 48)))
@@ -315,9 +395,9 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
         if lock:
             pygame.draw.rect(canvas, (105, 67, 40), lock.move(-camera[0], -camera[1]))
             canvas.blit(font.render("A passagem está bloqueada", True, (245, 212, 148)), (lock.left - camera[0] - 55, lock.bottom - camera[1] + 8))
-    panel = pygame.Surface((700, 32), pygame.SRCALPHA)
+    panel = pygame.Surface((820, 32), pygame.SRCALPHA)
     panel.fill((25, 31, 34, 210))
-    panel.blit(font.render(f"{region['name']} | WASD mover | Espaço atacar | V personagem | I inventário", True, (235, 222, 185)), (12, 8))
+    panel.blit(font.render(f"{region['name']} | WASD mover | Espaço atacar | Q Dash | E interagir | V personagem | I inventário", True, (235, 222, 185)), (12, 8))
     canvas.blit(panel, (16, 14))
     targets = region.get("npcs", []) + [obj for obj in region.get("interactables", []) if not obj.opened]
     target = nearest(targets, player) if player is not None else None
@@ -700,6 +780,7 @@ def main():
     inventory_ui = {"tab": "TODOS", "selected": None}
     dialogue.inventory = inventory
     debug = False
+    hitstop_frames = 0
     autosave_allowed = True
     if save_manager.SAVE_PATH.exists():
         try:
@@ -749,6 +830,7 @@ def main():
                         current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
                         drops, opened_desert_chests = loaded.drops, loaded.opened_chests
                         damage_numbers = []
+                        hitstop_frames = 0
                         dialogue.npc = None
                         dialogue.inventory = inventory
                         ui_mode = None
@@ -796,9 +878,13 @@ def main():
                         inventory_ui["selected"] = shown[index]
                         result = apply_inventory_action(shown[index], inventory, player, inventory_ui)
                         if result: quest_manager.notice, quest_manager.notice_timer = result[1], 150
-                elif event.key == pygame.K_SPACE and ui_mode is None:
+                elif event.key == pygame.K_SPACE and ui_mode is None and not dialogue.active:
                     player.attack()
-        if ui_mode is None and not dialogue.active:
+                elif event.key == pygame.K_q and ui_mode is None and not dialogue.active:
+                    player.start_dash(pygame.key.get_pressed())
+        if hitstop_frames > 0:
+            hitstop_frames -= 1
+        elif ui_mode is None and not dialogue.active:
             if current_region == "forest":
                 region["north_locked"] = not quest_manager.forest_boss_defeated
             # O encontro só pode nascer depois da recompensa da primeira quest.
@@ -818,12 +904,14 @@ def main():
                 hp_before = player.hp
                 enemy.update(player, region["obstacles"])
                 if player.hp < hp_before:
+                    hitstop_frames = max(hitstop_frames, 2 if enemy.attack_action != "charged" else 3)
                     damage_numbers.append(DamageNumber(str(hp_before - player.hp),
                                                        player.x, player.y - 82, (250, 108, 104)))
                 if player.attack_box.colliderect(enemy.hurtbox) and getattr(enemy, "last_player_attack", -1) != player.attack_serial:
                     enemy_hp_before = enemy.hp
                     if enemy.receive_hit(player.current_attack_damage, player.x, player.y,
                                          player.knockback_power):
+                        hitstop_frames = max(hitstop_frames, 3 if player.attack_is_critical else 2)
                         enemy.last_player_attack = player.attack_serial
                         damage_numbers.append(DamageNumber(
                             f"{enemy_hp_before - enemy.hp}{'!' if player.attack_is_critical else ''}",
@@ -885,6 +973,7 @@ def main():
                     player.x, player.y = region["spawn"].get(previous_region, (1024, 576))
                     player.attack_timer = 0
                     player.attack_cooldown_timer = 0
+                    player.dash_timer = player.dash_iframes = 0
                     player.invulnerability_timer = 30
                     autosave_pending = True
                     break
@@ -897,7 +986,8 @@ def main():
         camera = camera_for(player)
         quest_manager.update()
         draw_world(canvas, region, font, camera, player, enemies, drops, debug)
-        damage_numbers = [number for number in damage_numbers if number.update()]
+        if hitstop_frames == 0:
+            damage_numbers = [number for number in damage_numbers if number.update()]
         for number in damage_numbers:
             number.draw(canvas, camera, font, title_font)
         draw_hud(canvas, player, font)

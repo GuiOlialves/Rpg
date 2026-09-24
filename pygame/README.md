@@ -19,6 +19,7 @@ python main.py
 | --- | --- |
 | `WASD` ou setas | Mover |
 | `Espaço` | Atacar |
+| `Q` | Dash (10 SP; curta esquiva na direção de movimento ou da última direção) |
 | `E` | Conversar, aceitar/entregar a missão ou abrir um baú |
 | `V` | Abrir atributos e equipamentos |
 | `I` | Abrir inventário |
@@ -27,6 +28,7 @@ python main.py
 | `Esc` | Fechar a tela atual ou sair |
 | `F5` | Salvar em `savegame.json` |
 | `F9` | Carregar manualmente o save |
+| `F3` | Exibir hitboxes de combate e avisos dos ataques |
 
 ## Estrutura
 
@@ -48,3 +50,5 @@ Os sprites são mantidos separados do código-fonte e preservam a estrutura de p
 A versão 0.1 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
 
 Os quatro atributos afetam HP, SP, ataque, defesa, poder mágico, velocidade, cadência e crítico. O menu `V` mostra os bônus de equipamento, os stats de combate e a prévia de cada ponto ao passar o mouse sobre `+`.
+
+O Dash percorre até 99 pixels em 11 frames, tem 6 frames iniciais de esquiva e 39 frames de recarga. O SP começa a regenerar lentamente após três segundos sem gasto (1 ponto a cada 45 frames); Éter continua recuperando SP imediatamente.

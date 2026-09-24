@@ -7,8 +7,8 @@ from items import consumable
 
 ENEMY_CONFIGS = {
     "slime": {
-        "name": "Slime", "max_hp": 28, "damage": 5, "speed": 1.15,
-        "perception": 220, "attack_range": 34, "cooldown": 70,
+        "name": "Slime", "max_hp": 28, "damage": 5, "speed": 1.45,
+        "perception": 245, "attack_range": 48, "cooldown": 62,
         # O spritesheet possui quantidades diferentes por animação:
         # idle = 4, movimento = 6, ataque = 7, dano = 3, morte = 5.
         # Ler colunas além desses limites captura frames vazios.
@@ -17,15 +17,15 @@ ENEMY_CONFIGS = {
         "drop": {"id": "herb", "chance": 0.55, "min": 1, "max": 2}, "xp_reward": 18,
     },
     "warrior": {
-        "name": "Guardião Errante", "max_hp": 64, "damage": 9, "speed": 0.78,
-        "perception": 260, "attack_range": 52, "cooldown": 92,
+        "name": "Guardião Errante", "max_hp": 64, "damage": 9, "speed": 1.55,
+        "perception": 290, "attack_range": 82, "cooldown": 72,
         "frame_size": 192, "scale": 0.65, "hitbox_radius": 23, "idle_frames": 8, "move_frames": 6,
         "attack_frames": 4, "hurt_frames": 1, "death_frames": 1,
         "drop": {"id": "ether", "chance": 0.45, "min": 1, "max": 1}, "xp_reward": 42,
     },
     "forest_guardian": {
         "name": "Guardião da Clareira", "max_hp": 180, "damage": 18, "speed": 0.9,
-        "perception": 420, "attack_range": 58, "cooldown": 70,
+        "perception": 420, "attack_range": 92, "cooldown": 26,
         "frame_size": 192, "scale": 1.0, "hitbox_radius": 30, "idle_frames": 8, "move_frames": 6,
         "attack_frames": 4, "hurt_frames": 1, "death_frames": 1,
         "drop": {"id": "ether", "chance": 1.0, "min": 2, "max": 2}, "xp_reward": 180,
@@ -40,7 +40,7 @@ ENEMY_CONFIGS = {
         "drop": {"id": "herb", "chance": 0.50, "min": 1, "max": 2}, "xp_reward": 58,
     },
     "dune_lancer": {
-        "name": "Lanceiro das Ruínas", "max_hp": 112, "damage": 16, "speed": 0.82,
+        "name": "Lanceiro das Ruínas", "max_hp": 112, "damage": 16, "speed": 1.3,
         "perception": 300, "attack_range": 76, "cooldown": 92,
         "frame_size": 320, "scale": 0.42, "hitbox_radius": 25, "idle_frames": 12, "move_frames": 6,
         "attack_frames": 3, "hurt_frames": 1, "death_frames": 1,
@@ -95,10 +95,15 @@ class Enemy:
         self.dead_timer = 0
         self.knockback_x = self.knockback_y = 0.0
         self.anim_tick = 0
-        self.charge_timer = 0
-        self.charge_hit = False
-        self.charge_dx = self.charge_dy = 0.0
         self.telegraph_target = None
+        self.attack_action = None
+        self.attack_phase = None
+        self.phase_timer = 0
+        self.attack_direction = (0.0, 1.0)
+        self.last_action = None
+        self.attack_zone = None
+        self.hit_confirmed = False
+        self.retreat_timer = 0
         self.rng = random.Random(seed + 300)
         self.idle_sheet = load(self._path("Idle"))
         self.move_sheet = load(self._path("Run"))
@@ -136,7 +141,9 @@ class Enemy:
 
     def _move(self, dx, dy, obstacles):
         self.x += dx; self.y += dy
-        if any(self.hitbox.colliderect(rect) for rect in obstacles):
+        box = self.hitbox
+        outside = box.left < 0 or box.top < 0 or box.right > 2048 or box.bottom > 1152
+        if outside or any(box.colliderect(rect) for rect in obstacles):
             self.x -= dx; self.y -= dy
             return False
         return True
@@ -147,23 +154,117 @@ class Enemy:
         self.state = "WANDER"
         self.state_timer = self.rng.randrange(35, 100)
 
+    def _direction_to(self, player):
+        dx, dy = player.x - self.x, player.y - self.y
+        length = max(1.0, math.hypot(dx, dy))
+        return dx / length, dy / length
+
+    def _strike_box(self, action=None):
+        action = action or self.attack_action or "normal"
+        reach = {"slime": 46, "warrior": 80, "forest_guardian": 88,
+                 "dune_lancer": 83, "desert_scout": 190}.get(self.kind, 70)
+        if action == "charged": reach = 115
+        dx, dy = self.attack_direction
+        width = 56 if self.kind == "forest_guardian" else 40 if self.kind == "slime" else 48
+        if abs(dx) >= abs(dy):
+            left = self.x + (17 if dx >= 0 else -reach - 17)
+            return pygame.Rect(round(left), round(self.y - width / 2), reach, width)
+        top = self.y + (12 if dy >= 0 else -reach - 12)
+        return pygame.Rect(round(self.x - width / 2), round(top), width, reach)
+
+    def _begin_attack(self, action, player):
+        self.attack_action = action
+        self.last_action = action
+        self.attack_phase = "windup"
+        self.attack_direction = self._direction_to(player)
+        self.facing = -1 if self.attack_direction[0] < 0 else 1
+        self.attack_hit = False
+        self.hit_confirmed = False
+        self.attack_zone = None
+        self.state = "ATTACK"
+        self.anim_tick = 0
+        low_hp = self.kind == "forest_guardian" and self.hp <= self.max_hp * 0.4
+        windups = {"normal": 13 if self.kind == "slime" else 12,
+                   "charged": 30, "charge": 24, "aoe": 29, "ranged": 25}
+        self.phase_timer = windups[action] - (3 if low_hp else 0)
+        if action == "ranged": self.telegraph_target = (player.x, player.y)
+
+    def _choose_guardian_action(self, distance):
+        if distance > 145:
+            # Depois da investida, aproxima-se antes de repetir o mesmo aviso.
+            return None if self.last_action == "charge" else "charge"
+        if distance > 115:
+            return "charge" if self.last_action == "charged" else "charged"
+        elif distance < 62:
+            candidates = ("aoe", "normal", "charged")
+        else:
+            candidates = ("normal", "charged", "charge")
+        if self.last_action == candidates[0] and len(candidates) > 1:
+            return candidates[1]
+        if distance < 62 and self.last_action == "aoe": return "normal"
+        return candidates[0]
+
+    def _attack_update(self, player, obstacles):
+        action = self.attack_action
+        self.phase_timer -= 1
+        if self.attack_phase == "windup":
+            if action == "normal":
+                dx, dy = self.attack_direction
+                windup_step = 1.4 if self.kind == "slime" else 1.6 if self.kind == "warrior" else 1.0
+                self._move(dx * windup_step, dy * windup_step, obstacles)
+            if self.phase_timer <= 0:
+                self.attack_phase = "active"
+                self.phase_timer = 12 if action == "charge" else 5 if action == "aoe" else 4
+                self.attack_zone = None
+            return
+        if self.attack_phase == "active":
+            dx, dy = self.attack_direction
+            if action == "charge":
+                # Rota travada no início; pequenos passos impedem atravessar sólidos.
+                if not self._move(dx * 7, dy * 7, obstacles) or not self._move(dx * 7, dy * 7, obstacles):
+                    self.phase_timer = 0
+                zone = self.hitbox.inflate(20, 20)
+            elif action in {"normal", "charged"}:
+                step = 5 if self.kind == "slime" else 4 if action == "normal" else 3
+                self._move(dx * step, dy * step, obstacles)
+                zone = self._strike_box(action)
+            elif action == "aoe":
+                zone = pygame.Rect(round(self.x - 65), round(self.y - 65), 130, 130)
+            else:
+                zone = pygame.Rect(round(self.telegraph_target[0] - 25),
+                                   round(self.telegraph_target[1] - 25), 50, 50)
+            self.attack_zone = zone
+            in_zone = zone.colliderect(player.hitbox)
+            if action == "aoe":
+                in_zone = math.hypot(player.x - self.x, player.y - self.y) <= 65 + 10
+            if not self.attack_hit and in_zone:
+                power = 1.6 if action == "charged" else 1.25 if action in {"charge", "aoe"} else 1.0
+                if player.take_damage(round(self.damage * power), self.x, self.y, power):
+                    self.attack_hit = self.hit_confirmed = True
+            if self.phase_timer <= 0:
+                self.attack_phase = "recovery"
+                self.phase_timer = {"normal": 22 if self.kind == "forest_guardian" else 15, "charged": 30, "charge": 28,
+                                    "aoe": 25, "ranged": 20}[action]
+                self.retreat_timer = 18 if self.kind == "forest_guardian" and self.hit_confirmed else 0
+                self.attack_zone = None
+            return
+        if self.retreat_timer > 0:
+            dx, dy = self._direction_to(player)
+            self._move(-dx * 3.4, -dy * 3.4, obstacles)
+            self.retreat_timer -= 1
+        if self.phase_timer <= 0:
+            self.state = "IDLE"; self.state_timer = 8
+            self.attack_phase = None; self.attack_action = None
+            cooldown = self.config["cooldown"]
+            if self.kind == "forest_guardian" and self.hp <= self.max_hp * 0.4:
+                cooldown = round(cooldown * 0.75)
+            self.attack_cooldown = cooldown
+
     def update(self, player, obstacles):
         self.anim_tick += 1
         if self.state == "DEAD":
             self.dead_timer -= 1
             return self.dead_timer > 0
-        if self.kind in {"forest_guardian", "dune_lancer"} and self.charge_timer > 0:
-            self.charge_timer -= 1
-            self.state = "ATTACK"
-            if self.kind == "dune_lancer" and 20 >= self.charge_timer > 8:
-                self._move(self.charge_dx * 5.5, self.charge_dy * 5.5, obstacles)
-            if self.charge_timer == 8 and not self.charge_hit:
-                self.charge_hit = True
-                reach = 44 if self.kind == "dune_lancer" else 34
-                if self.hitbox.inflate(reach, reach).colliderect(player.hitbox): player.take_damage(self.damage)
-            if self.charge_timer == 0:
-                self.state = "IDLE"; self.attack_cooldown = 80; self.state_timer = 30
-            return True
         if self.attack_cooldown > 0: self.attack_cooldown -= 1
         if self.hurt_timer > 0:
             self.hurt_timer -= 1
@@ -171,16 +272,13 @@ class Enemy:
             self.knockback_x *= 0.75; self.knockback_y *= 0.75
             if self.hurt_timer == 0: self.state = "IDLE"; self.state_timer = 20
             return True
+        if self.kind == "forest_guardian" and self.state == "ATTACK" and abs(self.knockback_x) + abs(self.knockback_y) > 0.1:
+            self._move(self.knockback_x, self.knockback_y, obstacles)
+            self.knockback_x *= 0.5; self.knockback_y *= 0.5
         distance_player = math.hypot(player.x - self.x, player.y - self.y)
         distance_home = math.hypot(self.spawn_x - self.x, self.spawn_y - self.y)
         if self.state == "ATTACK":
-            self.state_timer -= 1
-            if self.state_timer == 10 and not self.attack_hit:
-                self.attack_hit = True
-                if distance_player <= self.config["attack_range"] + 10:
-                    player.take_damage(self.damage)
-            if self.state_timer <= 0:
-                self.state = "IDLE"; self.state_timer = 30; self.attack_cooldown = self.config["cooldown"]
+            self._attack_update(player, obstacles)
             return True
         if distance_player <= self.config["perception"] and distance_home <= 360:
             if self.kind == "desert_scout" and distance_player < 105 and self.attack_cooldown > 0:
@@ -188,18 +286,14 @@ class Enemy:
                 self._move(math.cos(angle) * self.speed, math.sin(angle) * self.speed, obstacles)
                 self.facing = -1 if player.x < self.x else 1
                 return True
-            if distance_player <= self.config["attack_range"] and self.attack_cooldown <= 0:
-                if self.kind == "forest_guardian":
-                    self.charge_timer = 42; self.charge_hit = False
-                elif self.kind == "dune_lancer":
-                    self.charge_timer = 40; self.charge_hit = False
-                    length = max(1, distance_player)
-                    self.charge_dx = (player.x - self.x) / length
-                    self.charge_dy = (player.y - self.y) / length
-                elif self.kind == "desert_scout":
-                    self.telegraph_target = (player.x, player.y)
-                self.state = "ATTACK"; self.state_timer = 28; self.attack_hit = False
-                return True
+            trigger_range = 195 if self.kind == "forest_guardian" else 160 if self.kind == "dune_lancer" else self.config["attack_range"]
+            if distance_player <= trigger_range and self.attack_cooldown <= 0:
+                action = (self._choose_guardian_action(distance_player) if self.kind == "forest_guardian"
+                          else "charge" if self.kind == "dune_lancer" and distance_player > 85
+                          else "ranged" if self.kind == "desert_scout" else "normal")
+                if action:
+                    self._begin_attack(action, player)
+                    return True
             self.state = "CHASE"
             angle = math.atan2(player.y - self.y, player.x - self.x)
             moved = self._move(math.cos(angle) * self.speed, math.sin(angle) * self.speed, obstacles)
@@ -224,17 +318,22 @@ class Enemy:
         if self.state == "DEAD" or self.hurt_timer > 0: return False
         self.hp = max(0, self.hp - damage)
         angle = math.atan2(self.y - from_y, self.x - from_x)
-        force = (1.5 if self.kind == "forest_guardian" else 5) * knockback
+        special = self.kind == "forest_guardian" and self.state == "ATTACK"
+        force = (0.9 if special else 1.7 if self.kind == "forest_guardian" else 4.0) * knockback
         self.knockback_x, self.knockback_y = math.cos(angle) * force, math.sin(angle) * force
-        self.hurt_timer = 12
-        self.state = "HURT"
+        if not special:
+            self.hurt_timer = 7 if self.kind == "forest_guardian" else 10
+            self.state = "HURT"
+            self.attack_zone = None
+            self.attack_phase = self.attack_action = None
+            self.attack_cooldown = max(self.attack_cooldown, 12)
         if self.hp <= 0:
             self.state = "DEAD"; self.dead_timer = 36; self.hurt_timer = 0
+            self.attack_zone = None
         return True
 
     def attack_box(self):
-        r = self.config["attack_range"]
-        return pygame.Rect(round(self.x + (r if self.facing > 0 else -r - 28)), round(self.y - 18), 42, 36)
+        return self.attack_zone if self.state == "ATTACK" and self.attack_zone else pygame.Rect(0, 0, 0, 0)
 
     def drop(self):
         if self.state != "DEAD" or self.dead_timer != 35: return None
@@ -266,15 +365,27 @@ class Enemy:
         if self.state == "DEAD" and self.dead_timer < 8:
             image.set_alpha(max(0, self.dead_timer * 32))
         canvas.blit(image, (draw_x, draw_y))
-        if self.kind == "dune_lancer" and self.charge_timer > 20:
+        if self.state == "ATTACK" and self.attack_phase == "windup":
             center = (round(self.x - camera[0]), round(self.y - camera[1]))
-            pygame.draw.circle(canvas, (238, 161, 68), center, 62, 2)
-            pygame.draw.circle(canvas, (248, 211, 130), center, 48, 1)
-        elif self.kind == "desert_scout" and self.state == "ATTACK" and self.telegraph_target:
-            tx, ty = self.telegraph_target[0] - camera[0], self.telegraph_target[1] - camera[1]
-            origin = (round(self.x - camera[0]), round(self.y - camera[1] - 20))
-            pygame.draw.line(canvas, (255, 209, 105), origin, (round(tx), round(ty)), 2)
-            pygame.draw.circle(canvas, (255, 224, 143), (round(tx), round(ty)), 24, 2)
+            if self.attack_action == "aoe":
+                pygame.draw.circle(canvas, (255, 167, 73), center, 65, 3)
+                pygame.draw.circle(canvas, (255, 218, 133), center, 53, 1)
+            elif self.attack_action == "charge":
+                dx, dy = self.attack_direction
+                target = (round(center[0] + dx * 168), round(center[1] + dy * 168))
+                pygame.draw.line(canvas, (255, 169, 78), center, target, 4)
+                pygame.draw.circle(canvas, (255, 218, 133), target, 8, 2)
+            elif self.attack_action == "ranged" and self.telegraph_target:
+                tx, ty = self.telegraph_target[0] - camera[0], self.telegraph_target[1] - camera[1]
+                origin = (round(self.x - camera[0]), round(self.y - camera[1] - 20))
+                pygame.draw.line(canvas, (255, 209, 105), origin, (round(tx), round(ty)), 2)
+                pygame.draw.circle(canvas, (255, 224, 143), (round(tx), round(ty)), 25, 2)
+            else:
+                warning = self._strike_box(self.attack_action).move(-camera[0], -camera[1])
+                pygame.draw.rect(canvas, (255, 112, 75) if self.attack_action == "charged" else (255, 174, 87),
+                                 warning, 3 if self.attack_action == "charged" else 2)
+                if self.attack_action == "charged":
+                    pygame.draw.circle(canvas, (255, 212, 126), center, 38, 2)
         if self.state == "HURT":
             flash=image.copy()
             flash.fill((90,25,12,0),special_flags=pygame.BLEND_RGBA_ADD)
