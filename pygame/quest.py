@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from items import consumable
 
 AVAILABLE, ACTIVE, COMPLETED, REWARDED = "AVAILABLE", "ACTIVE", "COMPLETED", "REWARDED"
 
@@ -23,7 +24,7 @@ class Quest:
 
 class QuestManager:
     def __init__(self):
-        self.quests = {"forest_trouble": Quest("forest_trouble", "Problemas na Floresta", "Derrote os slimes que ameaçam a vila.", "slime", 5, {"name": "Erva", "amount": 3, "color": (84, 177, 113)}, "alden")}
+        self.quests = {"forest_trouble": Quest("forest_trouble", "Problemas na Floresta", "Derrote os slimes que ameaçam a vila.", "slime", 5, consumable("herb", 3), "alden")}
         self.notice = ""
         self.notice_timer = 0
         self.forest_event_started = False
@@ -40,7 +41,7 @@ class QuestManager:
     def claim(self, quest_id, inventory):
         quest = self.get(quest_id)
         if quest.state != COMPLETED: return False
-        item = next((i for i in inventory if i["name"] == quest.reward["name"]), None)
+        item = next((i for i in inventory if i["id"] == quest.reward["id"]), None)
         if item: item["amount"] += quest.reward["amount"]
         else: inventory.append(quest.reward.copy())
         quest.state = REWARDED

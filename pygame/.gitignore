@@ -6,3 +6,5 @@ verification/
 release/
 backup_antes_vila/
 .DS_Store
+savegame.json
+.savegame-*.tmp

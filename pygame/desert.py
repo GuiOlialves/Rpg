@@ -2,6 +2,7 @@
 import random
 import pygame
 import environment as env
+from items import consumable
 
 WORLD = (2048, 1152)
 ROOT = "sprites_meu/craftpix-891121-free-2d-rpg-desert-tileset/PNG/"
@@ -126,9 +127,9 @@ def build(load, opened_chests=None):
 
     # Baús isolados em desvios que recompensam exploração.
     chest_data = [
-        Chest("desert_chest_oasis", (1215, 365), {"name": "Erva", "amount": 2, "color": (84, 177, 113)}, "desert_chest_oasis" in opened_chests),
-        Chest("desert_chest_ruins", (1580, 660), {"name": "Éter", "amount": 2, "color": (62, 128, 207)}, "desert_chest_ruins" in opened_chests),
-        Chest("desert_chest_hidden", (480, 745), {"name": "Erva", "amount": 2, "color": (84, 177, 113)}, "desert_chest_hidden" in opened_chests),
+        Chest("desert_chest_oasis", (1215, 365), consumable("herb", 2), "desert_chest_oasis" in opened_chests),
+        Chest("desert_chest_ruins", (1580, 660), consumable("ether", 2), "desert_chest_ruins" in opened_chests),
+        Chest("desert_chest_hidden", (480, 745), consumable("herb", 2), "desert_chest_hidden" in opened_chests),
     ]
     for chest in chest_data:
         sheet=load('assets/shared/chest_01.png')

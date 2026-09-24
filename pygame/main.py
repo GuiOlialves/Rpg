@@ -13,6 +13,8 @@ from npc import NPC, nearest
 from dialogue import DialogueBox
 from quest import QuestManager
 from equipment import item, SLOTS
+from items import CONSUMABLES, consumable
+import save_manager
 
 ROOT = Path(__file__).parent
 WINDOW = (1366, 768)
@@ -212,7 +214,7 @@ def spawn_enemies(region):
     return [Enemy(kind, position, load, seed=index) for index, (kind, position) in enumerate(region.get("enemy_spawns", []))]
 
 def add_inventory_item(inventory, item_data):
-    existing = next((entry for entry in inventory if entry.get("name") == item_data["name"] and entry.get("type") != "equipment"), None)
+    existing = next((entry for entry in inventory if entry.get("id") == item_data["id"] and entry.get("type") != "equipment"), None)
     if existing: existing["amount"] += item_data["amount"]
     else: inventory.append(item_data.copy())
 
@@ -399,7 +401,7 @@ def draw_character_menu(canvas, player, font, title_font):
 
 def inventory_kind(item):
     if item.get("type") == "equipment" or item.get("slot"): return "equipment"
-    if item.get("name") in {"Poção", "Erva", "Éter"}: return "consumable"
+    if item.get("id") in CONSUMABLES: return "consumable"
     return "item"
 
 def inventory_items(inventory, tab):
@@ -519,7 +521,8 @@ def apply_inventory_action(selected, inventory, player, ui_state):
 
     if kind == "consumable":
         name = selected.get("name")
-        target, amount = {"Poção": ("hp", 30), "Erva": ("hp", 15), "Éter": ("sp", 30)}.get(name, (None, 0))
+        definition = CONSUMABLES.get(selected.get("id"), {})
+        target, amount = definition.get("resource"), definition.get("restore", 0)
         if target is None: return False, "Esse item não pode ser usado agora."
         current, maximum = getattr(player, target), getattr(player, f"max_{target}")
         if current >= maximum:
@@ -562,7 +565,7 @@ def main():
     enemies = spawn_enemies(region)
     drops = []
     font = pygame.font.Font(None, 22); title_font = pygame.font.Font(None, 30)
-    inventory = [{"name": "Poção", "amount": 3, "color": (194, 62, 68)}, {"name": "Éter", "amount": 2, "color": (62, 128, 207)}, {"name": "Erva", "amount": 5, "color": (84, 177, 113)}, item("iron_blade"), item("reinforced_leather")]
+    inventory = [consumable("potion", 3), consumable("ether", 2), consumable("herb", 5), item("iron_blade"), item("reinforced_leather")]
     ui_mode = None
     dialogue = DialogueBox()
     quest_manager = QuestManager()
@@ -570,8 +573,17 @@ def main():
     inventory_ui = {"tab": "TODOS", "selected": None}
     dialogue.inventory = inventory
     debug = False
+    autosave_allowed = True
+    if save_manager.SAVE_PATH.exists():
+        try:
+            save_manager.read_save()
+        except save_manager.SaveError:
+            autosave_allowed = False
+            quest_manager.notice = "Save inválido encontrado. Autosave pausado; F5 para substituir."
+            quest_manager.notice_timer = 360
     running = True
     while running:
+        autosave_pending = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -581,13 +593,49 @@ def main():
                     _, notice = result
                     quest_manager.notice, quest_manager.notice_timer = notice, 150
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if event.key == pygame.K_F5:
+                    try:
+                        save_manager.save_game(player, inventory, quest_manager, current_region,
+                                               opened_desert_chests, drops)
+                    except save_manager.SaveError:
+                        quest_manager.notice = "Não foi possível salvar o jogo."
+                    else:
+                        autosave_allowed = True
+                        quest_manager.notice = "Jogo salvo."
+                    quest_manager.notice_timer = 180
+                elif event.key == pygame.K_F9:
+                    try:
+                        loaded = save_manager.load_game(
+                            save_manager.SAVE_PATH,
+                            lambda: Player(player.idle, player.attack_sheet),
+                            build_region, spawn_enemies,
+                            lambda: Enemy("forest_guardian", (1300, 430), load, seed=77))
+                    except save_manager.MissingSaveError:
+                        quest_manager.notice = "Nenhum save encontrado."
+                    except save_manager.SaveError:
+                        autosave_allowed = False
+                        quest_manager.notice = "Save inválido ou corrompido; jogo atual preservado."
+                    else:
+                        player, inventory, quest_manager = loaded.player, loaded.inventory, loaded.quests
+                        current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
+                        drops, opened_desert_chests = loaded.drops, loaded.opened_chests
+                        dialogue.npc = None
+                        dialogue.inventory = inventory
+                        ui_mode = None
+                        inventory_ui = {"tab": "TODOS", "selected": None}
+                        autosave_allowed = True
+                        quest_manager.notice = "Jogo carregado."
+                    quest_manager.notice_timer = 180
+                elif event.key == pygame.K_ESCAPE:
                     if dialogue.active: dialogue.npc = None
                     elif ui_mode is not None: ui_mode = None
                     else: running = False
                 elif event.key == pygame.K_e:
                     if dialogue.active:
+                        quest_state = quest_manager.get("forest_trouble").state
                         dialogue.advance()
+                        if quest_state != quest_manager.get("forest_trouble").state and quest_manager.get("forest_trouble").state == "REWARDED":
+                            autosave_pending = True
                     elif ui_mode is None:
                         targets = region.get("npcs", []) + [obj for obj in region.get("interactables", []) if not obj.opened]
                         target = nearest(targets, player)
@@ -652,7 +700,10 @@ def main():
                     if player.level > old_level:
                         quest_manager.notice = f"LEVEL UP! Nível {player.level}  |  +{STAT_POINTS_PER_LEVEL} pontos"
                         quest_manager.notice_timer = 210
+                    quest_state = quest_manager.get("forest_trouble").state
                     quest_manager.enemy_defeated(enemy.kind)
+                    if quest_state != quest_manager.get("forest_trouble").state and quest_manager.get("forest_trouble").state == "COMPLETED":
+                        autosave_pending = True
                     if enemy.kind == "forest_guardian":
                         quest_manager.forest_boss_defeated = True
                         region["arena_locked"] = False
@@ -662,6 +713,7 @@ def main():
                             inventory.append(item("grove_charm")); quest_manager.boss_loot_given = True
                             quest_manager.notice = "Amuleto da Clareira recebido!"
                             quest_manager.notice_timer = 210
+                        autosave_pending = True
             enemies = [enemy for enemy in enemies if enemy.state != "DEAD" or enemy.dead_timer > 0]
             drops = [drop for drop in drops if drop.update()]
             for drop in drops[:]:
@@ -683,13 +735,22 @@ def main():
                     if destination not in {"village", "forest", "desert"}: continue
                     previous_region = current_region
                     current_region = destination
-                    region = build_region(current_region, opened_desert_chests)
-                    enemies = spawn_enemies(region)
+                    region, enemies = save_manager.prepare_region(
+                        current_region, quest_manager, opened_desert_chests,
+                        build_region, spawn_enemies,
+                        lambda: Enemy("forest_guardian", (1300, 430), load, seed=77))
                     drops = []
                     player.x, player.y = region["spawn"].get(previous_region, (1024, 576))
                     player.attack_timer = 0
                     player.invulnerability_timer = 30
+                    autosave_pending = True
                     break
+        if autosave_pending and autosave_allowed:
+            try:
+                save_manager.save_game(player, inventory, quest_manager, current_region,
+                                       opened_desert_chests, drops)
+            except save_manager.SaveError:
+                quest_manager.notice, quest_manager.notice_timer = "Autosave falhou.", 180
         camera = camera_for(player)
         quest_manager.update()
         draw_world(canvas, region, font, camera, player, enemies, drops, debug)

@@ -24,6 +24,8 @@ python main.py
 | `I` | Abrir inventário |
 | `1`–`4` | Distribuir pontos de atributo ou usar a ação do item selecionado |
 | `Esc` | Fechar a tela atual ou sair |
+| `F5` | Salvar em `savegame.json` |
+| `F9` | Carregar manualmente o save |
 
 ## Estrutura
 
@@ -31,6 +33,8 @@ python main.py
 - `village.py`, `forest.py` e `desert.py`: composição das regiões.
 - `environment.py` e `ambient.py`: texturas, camadas, sombras e efeitos ambientais.
 - `enemy.py`, `npc.py`, `quest.py`, `equipment.py` e `dialogue.py`: lógica dos sistemas do jogo.
+- `items.py`: IDs e dados dos consumíveis.
+- `save_manager.py`: validação, gravação atômica e restauração do save.
 - `assets/` e `sprites_meu/`: imagens necessárias para executar o projeto.
 
 ## Assets e créditos
@@ -39,4 +43,4 @@ Os sprites são mantidos separados do código-fonte e preservam a estrutura de p
 
 ## Estado do projeto
 
-A versão 0.1 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima.
+A versão 0.1 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import math
 import random
 import pygame
+from items import consumable
 
 ENEMY_CONFIGS = {
     "slime": {
@@ -13,21 +14,21 @@ ENEMY_CONFIGS = {
         # Ler colunas além desses limites captura frames vazios.
         "frame_size": 32, "scale": 3, "hitbox_radius": 18, "idle_frames": 4, "move_frames": 6,
         "attack_frames": 7, "hurt_frames": 3, "death_frames": 5,
-        "drop": {"name": "Erva", "color": (84, 177, 113), "chance": 0.55, "min": 1, "max": 2}, "xp_reward": 18,
+        "drop": {"id": "herb", "chance": 0.55, "min": 1, "max": 2}, "xp_reward": 18,
     },
     "warrior": {
         "name": "Guardião Errante", "max_hp": 64, "damage": 9, "speed": 0.78,
         "perception": 260, "attack_range": 52, "cooldown": 92,
         "frame_size": 192, "scale": 0.65, "hitbox_radius": 23, "idle_frames": 8, "move_frames": 6,
         "attack_frames": 4, "hurt_frames": 1, "death_frames": 1,
-        "drop": {"name": "Éter", "color": (62, 128, 207), "chance": 0.45, "min": 1, "max": 1}, "xp_reward": 42,
+        "drop": {"id": "ether", "chance": 0.45, "min": 1, "max": 1}, "xp_reward": 42,
     },
     "forest_guardian": {
         "name": "Guardião da Clareira", "max_hp": 180, "damage": 18, "speed": 0.9,
         "perception": 420, "attack_range": 58, "cooldown": 70,
         "frame_size": 192, "scale": 1.0, "hitbox_radius": 30, "idle_frames": 8, "move_frames": 6,
         "attack_frames": 4, "hurt_frames": 1, "death_frames": 1,
-        "drop": {"name": "Éter", "color": (62, 128, 207), "chance": 1.0, "min": 2, "max": 2}, "xp_reward": 180,
+        "drop": {"id": "ether", "chance": 1.0, "min": 2, "max": 2}, "xp_reward": 180,
     },
     "desert_scout": {
         "name": "Batedor das Dunas", "max_hp": 82, "damage": 13, "speed": 1.32,
@@ -36,7 +37,7 @@ ENEMY_CONFIGS = {
         "attack_frames": 8, "hurt_frames": 1, "death_frames": 1,
         "sprite_team": "Yellow Units", "sprite_unit": "Archer",
         "animations": {"Idle": "Idle", "Run": "Run", "Attack": "Shoot"},
-        "drop": {"name": "Erva", "color": (84, 177, 113), "chance": 0.50, "min": 1, "max": 2}, "xp_reward": 58,
+        "drop": {"id": "herb", "chance": 0.50, "min": 1, "max": 2}, "xp_reward": 58,
     },
     "dune_lancer": {
         "name": "Lanceiro das Ruínas", "max_hp": 112, "damage": 16, "speed": 0.82,
@@ -45,7 +46,7 @@ ENEMY_CONFIGS = {
         "attack_frames": 3, "hurt_frames": 1, "death_frames": 1,
         "sprite_team": "Black Units", "sprite_unit": "Lancer",
         "animations": {"Idle": "Idle", "Run": "Run", "Attack": "Right_Attack"},
-        "drop": {"name": "Éter", "color": (62, 128, 207), "chance": 0.38, "min": 1, "max": 1}, "xp_reward": 78,
+        "drop": {"id": "ether", "chance": 0.38, "min": 1, "max": 1}, "xp_reward": 78,
     },
 }
 
@@ -239,7 +240,7 @@ class Enemy:
         if self.state != "DEAD" or self.dead_timer != 35: return None
         data = self.config["drop"]
         if random.random() > data["chance"]: return None
-        item = {"name": data["name"], "amount": random.randint(data["min"], data["max"]), "color": data["color"]}
+        item = consumable(data["id"], random.randint(data["min"], data["max"]))
         return Drop(item, self.x, self.y)
 
     def draw(self, canvas, camera):
