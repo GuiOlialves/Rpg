@@ -71,6 +71,14 @@ class CombatTests(unittest.TestCase):
         player.sp = 9
         self.assertFalse(player.start_dash(defaultdict(bool)))
         self.assertEqual(player.sp, 9)
+        self.assertEqual((player.dash_feedback_kind, player.dash_feedback_timer), ("sp", 18))
+        player.sp = 20
+        player.dash_cooldown = 5
+        self.assertFalse(player.start_dash(defaultdict(bool)))
+        self.assertEqual((player.dash_feedback_kind, player.dash_feedback_timer), ("cooldown", 18))
+        canvas = pygame.Surface(main.VIEW, pygame.SRCALPHA)
+        main.draw_hud(canvas, player, pygame.font.Font(None, 20))
+        self.assertEqual(canvas.get_at((216, main.VIEW[1] - 120 + 61))[:3], (241, 190, 91))
         player = self.player()
         self.assertTrue(player.start_dash(defaultdict(bool, {pygame.K_d: True})))
         for _ in range(main.DASH_IFRAMES):

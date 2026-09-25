@@ -106,6 +106,8 @@ class Player:
         self.dash_timer = self.dash_cooldown = self.dash_iframes = 0
         self.dash_dx = self.dash_dy = 0.0
         self.dash_trail = []
+        self.dash_feedback_timer = 0
+        self.dash_feedback_kind = ""
         self.sp_idle_frames = 0
         self.knockback_x = self.knockback_y = 0.0
         self.knockback_frames = 0
@@ -171,6 +173,7 @@ class Player:
             self.attack_cooldown_timer -= 1
         if self.dash_cooldown > 0: self.dash_cooldown -= 1
         if self.dash_iframes > 0: self.dash_iframes -= 1
+        if self.dash_feedback_timer > 0: self.dash_feedback_timer -= 1
         self.dash_trail = [(x, y, age - 1) for x, y, age in self.dash_trail if age > 1]
         self.sp_idle_frames += 1
         if self.sp_idle_frames >= SP_REGEN_DELAY and (self.sp_idle_frames - SP_REGEN_DELAY) % SP_REGEN_INTERVAL == 0:
@@ -219,8 +222,18 @@ class Player:
         self.y = max(38, min(WORLD[1] - 12, self.y))
 
     def start_dash(self, keys):
-        if self.hp <= 0 or self.dash_timer or self.dash_cooldown or self.sp < DASH_SP_COST:
+        if self.hp <= 0:
             return False
+        if self.dash_timer or self.dash_cooldown:
+            self.dash_feedback_timer = 18
+            self.dash_feedback_kind = "cooldown"
+            return False
+        if self.sp < DASH_SP_COST:
+            self.dash_feedback_timer = 18
+            self.dash_feedback_kind = "sp"
+            return False
+        self.dash_feedback_timer = 0
+        self.dash_feedback_kind = ""
         mx = int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_LEFT])
         my = int(keys[pygame.K_s] or keys[pygame.K_DOWN]) - int(keys[pygame.K_w] or keys[pygame.K_UP])
         if not (mx or my):
@@ -456,6 +469,8 @@ def restore_player_after_death(player, region_id, region, enemies):
     player.invulnerability_timer = RESPAWN_IFRAMES
     player.knockback_x = player.knockback_y = 0.0
     player.knockback_frames = 0
+    player.dash_feedback_timer = 0
+    player.dash_feedback_kind = ""
     player.attack_serial += 1
     return player.x, player.y
 
@@ -497,6 +512,9 @@ def draw_hud(canvas, player, font):
     panel.blit(font.render(f"Nv. {player.level}", True, (177, 187, 189)), (267, 9))
     draw_bar(panel, pygame.Rect(91, 32, 220, 25), player.hp, player.max_hp, (185, 51, 62), "HP", font)
     draw_bar(panel, pygame.Rect(91, 63, 220, 25), player.sp, player.max_sp, (54, 112, 196), "SP", font)
+    if player.dash_feedback_timer > 0:
+        color = (245, 102, 82) if player.dash_feedback_kind == "sp" else (241, 190, 91)
+        pygame.draw.rect(panel, color, pygame.Rect(89, 61, 224, 29), 2, border_radius=8)
     canvas.blit(panel, (16, VIEW[1] - 120))
     xp_rect = pygame.Rect(107, VIEW[1] - 14, 220, 8)
     pygame.draw.rect(canvas, (18, 23, 27), xp_rect, border_radius=3)
@@ -816,7 +834,7 @@ def handle_character_click(position, player):
 
 
 def main():
-    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.12")
+    pygame.init(); pygame.display.set_caption("O Vale RPG | v0.13")
     screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
     player = Player(load("assets/player/f_player_sheet.png"), load("assets/player/f_player_attack_sheet.png"))
     current_region = "village"
@@ -1107,7 +1125,9 @@ def main():
         if quest_text:
             canvas.blit(font.render(quest_text, True, (244, 224, 166)), (VIEW[0] - 310, 52))
         if quest_manager.notice_timer:
-            canvas.blit(font.render(quest_manager.notice, True, (255, 235, 170)), (VIEW[0]//2 - 110, 42))
+            notice = font.render(fit_text(quest_manager.notice, font, VIEW[0] - 350),
+                                 True, (255, 235, 170))
+            canvas.blit(notice, (16, 52))
         boss = next((e for e in enemies if e.kind == "forest_guardian" and e.state != "DEAD"), None)
         if boss:
             bar = pygame.Rect(280, 78, 464, 22)

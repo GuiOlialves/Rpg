@@ -1,6 +1,6 @@
 # O Vale — RPG em Pygame
 
-**Versão 0.12** · RPG 2D top-down desenvolvido em Python com Pygame CE.
+**Versão 0.13** · RPG 2D top-down desenvolvido em Python com Pygame CE.
 
 O jogo reúne exploração, combate e progressão em três áreas conectadas: Vila do Vale, Floresta Mística e Deserto das Dunas. A versão inclui inimigos com animações, NPCs e diálogos, uma missão inicial com chefe, equipamentos, inventário, atributos e salvamento da recompensa dos baús do deserto durante a sessão.
 
@@ -49,7 +49,7 @@ Os sprites são mantidos separados do código-fonte e preservam a estrutura de p
 
 ## Estado do projeto
 
-A versão 0.12 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
+A versão 0.13 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
 
 Os quatro atributos afetam HP, SP, ataque, defesa, poder mágico, velocidade, cadência e crítico. O menu `V` mostra os bônus de equipamento, os stats de combate e a prévia de cada ponto ao passar o mouse sobre `+`.
 

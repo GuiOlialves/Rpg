@@ -2,7 +2,7 @@
 
 Este repositório mantém as versões do projeto em pastas separadas.
 
-## Projeto em Pygame — versão 0.11
+## Projeto em Pygame — versão 0.13
 
 O jogo em Python/Pygame fica em [`pygame/`](pygame/). Para instalação, controles, sistemas implementados e créditos dos assets, consulte o [README do Pygame](pygame/README.md).
 

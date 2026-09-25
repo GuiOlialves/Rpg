@@ -3,6 +3,7 @@
 import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -123,6 +124,49 @@ class SaveLoadTests(unittest.TestCase):
                 self.save(player, inventory, quests)
         self.assertEqual(self.path.read_bytes(), good)
         self.assertEqual(list(Path(self.directory.name).glob(".savegame-*.tmp")), [])
+
+    def test_zero_hp_save_is_rejected_without_overwriting_valid_save(self):
+        player, inventory, quests = self.player(), self.starter(), QuestManager()
+        self.save(player, inventory, quests)
+        valid_bytes = self.path.read_bytes()
+
+        player.hp = 0
+        with self.assertRaises(save_manager.SaveError):
+            self.save(player, inventory, quests)
+        self.assertEqual(self.path.read_bytes(), valid_bytes)
+
+        legacy_zero_hp = json.loads(valid_bytes)
+        legacy_zero_hp["player"]["hp"] = 0
+        self.path.write_text(json.dumps(legacy_zero_hp), encoding="utf-8")
+        with self.assertRaises(save_manager.SaveError):
+            save_manager.read_save(self.path)
+
+    def test_game_over_stays_open_when_last_save_has_zero_hp(self):
+        player, inventory, quests = self.player(), self.starter(), QuestManager()
+        self.save(player, inventory, quests)
+        legacy_zero_hp = json.loads(self.path.read_text(encoding="utf-8"))
+        legacy_zero_hp["player"]["hp"] = 0
+        self.path.write_text(json.dumps(legacy_zero_hp), encoding="utf-8")
+
+        batches = [[] for _ in range(37)] + [
+            [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN)],
+            [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)],
+            [pygame.event.Event(pygame.QUIT)],
+        ]
+        died = False
+
+        def die_once(current_player, keys, obstacles):
+            nonlocal died
+            if not died:
+                died = True
+                current_player.hp = 0
+
+        with patch.object(save_manager, "SAVE_PATH", self.path), \
+             patch.object(main.Player, "update", die_once), \
+             patch.object(pygame.event, "get", side_effect=batches), \
+             patch.object(main.game_over.GameOverScreen, "draw", autospec=True) as draw_game_over:
+            self.assertEqual(main.main(), 0)
+        draw_game_over.assert_called()
 
     def test_regions_position_fallback_active_quest_and_guardian(self):
         player, inventory, quests = self.player(), self.starter(), QuestManager()

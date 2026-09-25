@@ -108,7 +108,7 @@ def validate(data):
         raise SaveError("Save inválido: atributos incompletos.")
     for name in STATS:
         _integer(stats[name], name, 1, 10000)
-    _integer(character.get("hp"), "hp")
+    _integer(character.get("hp"), "hp", 1)
     _integer(character.get("sp"), "sp")
     _position(character.get("position"), "position")
     inventory = data.get("inventory")
