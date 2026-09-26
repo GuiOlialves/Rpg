@@ -16,6 +16,8 @@ from enemy import Drop, Enemy
 from equipment import item
 from items import consumable
 from quest import ACTIVE, COMPLETED, REWARDED, QuestManager
+from story.story_manager import StoryManager
+from ui.game_renderer import GameRenderer
 import save_manager
 
 
@@ -163,6 +165,7 @@ class SaveLoadTests(unittest.TestCase):
 
         with patch.object(save_manager, "SAVE_PATH", self.path), \
              patch.object(main.Player, "update", die_once), \
+             patch("story.sequence.NarrativeSequence.update", return_value=True), \
              patch.object(pygame.event, "get", side_effect=batches), \
              patch.object(main.game_over.GameOverScreen, "draw", autospec=True) as draw_game_over:
             self.assertEqual(main.main(), 0)
@@ -208,6 +211,70 @@ class SaveLoadTests(unittest.TestCase):
         self.assertTrue(returned_region["arena_locked"])
         self.assertEqual([enemy.kind for enemy in returned_enemies], ["forest_guardian"])
 
+    def test_story_flag_round_trip_and_legacy_default(self):
+        player, inventory, quests = self.player(), self.starter(), QuestManager()
+        player.x, player.y = 512, 288
+        save_manager.save_game(player, inventory, quests, "home", set(), [], self.path,
+                               story=StoryManager({"woke_up": False}))
+        loaded = self.load()
+        self.assertEqual(loaded.region_id, "home")
+        self.assertFalse(loaded.story.get("woke_up"))
+        self.assertFalse(loaded.story.get("saw_silhouette"))
+        self.assertFalse(loaded.story.get("slime_quest_started"))
+        self.assertEqual((loaded.player.x, loaded.player.y), (512, 288))
+        self.assertEqual({obj.uid for obj in loaded.region["interactables"]},
+                         {"mirror", "sword", "house_door"})
+
+        quests.accept("forest_trouble")
+        save_manager.save_game(
+            player, inventory, quests, "home", set(), [], self.path,
+            story=StoryManager({
+                "woke_up": True,
+                "saw_silhouette": True,
+                "slime_quest_started": True,
+            }))
+        loaded_current = self.load()
+        self.assertTrue(loaded_current.story.get("saw_silhouette"))
+        self.assertTrue(loaded_current.story.get("slime_quest_started"))
+        self.assertEqual(loaded_current.quests.get("forest_trouble").state, ACTIVE)
+
+        legacy = json.loads(self.path.read_text(encoding="utf-8"))
+        legacy["story"] = {"woke_up": True}
+        self.path.write_text(json.dumps(legacy), encoding="utf-8")
+        loaded_partial = self.load()
+        self.assertTrue(loaded_partial.story.get("woke_up"))
+        self.assertFalse(loaded_partial.story.get("saw_silhouette"))
+        self.assertFalse(loaded_partial.story.get("slime_quest_started"))
+
+        del legacy["story"]
+        self.path.write_text(json.dumps(legacy), encoding="utf-8")
+        loaded_legacy = self.load()
+        self.assertTrue(loaded_legacy.story.get("woke_up"))
+
+    def test_new_game_opening_does_not_replace_existing_save(self):
+        player, inventory, quests = self.player(), self.starter(), QuestManager()
+        player.x, player.y = 1024, 576
+        self.save(player, inventory, quests, "village")
+        original = self.path.read_bytes()
+        seen_narrative = []
+        draw = GameRenderer.draw
+
+        def capture_draw(renderer, canvas, **kwargs):
+            seen_narrative.append(kwargs["narrative"])
+            return draw(renderer, canvas, **kwargs)
+
+        with patch.object(save_manager, "SAVE_PATH", self.path), \
+             patch("story.sequence.NarrativeSequence.update", return_value=True), \
+             patch.object(pygame.event, "get", side_effect=[
+                 [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F9)],
+                 [pygame.event.Event(pygame.QUIT)],
+             ]), \
+             patch("ui.game_renderer.GameRenderer.draw", autospec=True, side_effect=capture_draw):
+            self.assertEqual(main.main(), 0)
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertTrue(seen_narrative)
+        self.assertTrue(all(sequence is None for sequence in seen_narrative))
+
     def test_invalid_version_and_equipment_do_not_apply(self):
         player, inventory, quests = self.player(), self.starter(), QuestManager()
         self.save(player, inventory, quests)
@@ -235,24 +302,31 @@ class SaveLoadTests(unittest.TestCase):
             with patch.object(pygame.event, "get", side_effect=[
                 [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F5)],
                 [pygame.event.Event(pygame.QUIT)],
-            ]):
+            ]), patch("story.sequence.NarrativeSequence.update", return_value=True):
                 self.assertEqual(main.main(), 0)
             with patch.object(pygame.event, "get", side_effect=[
                 [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F9)],
                 [pygame.event.Event(pygame.QUIT)],
-            ]):
+            ]), patch("story.sequence.NarrativeSequence.update", return_value=True):
                 self.assertEqual(main.main(), 0)
         self.assertTrue(self.path.exists())
-        self.assertEqual(save_manager.read_save(self.path)["region"], "village")
+        self.assertEqual(save_manager.read_save(self.path)["region"], "home")
 
     def test_autosave_after_region_transition(self):
+        player, inventory, quests = self.player(), self.starter(), QuestManager()
+        self.save(player, inventory, quests, "village")
+
         def step_to_exit(player, keys, obstacles):
             if player.x == 1024 and player.y == 576:
                 player.x, player.y = 1990, 575
 
         with patch.object(save_manager, "SAVE_PATH", self.path), \
              patch.object(main.Player, "update", step_to_exit), \
-             patch.object(pygame.event, "get", side_effect=[[], [pygame.event.Event(pygame.QUIT)]]):
+             patch("story.sequence.NarrativeSequence.update", return_value=True), \
+             patch.object(pygame.event, "get", side_effect=[
+                 [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F9)],
+                 [pygame.event.Event(pygame.QUIT)]
+             ]):
             self.assertEqual(main.main(), 0)
         self.assertEqual(save_manager.read_save(self.path)["region"], "forest")
 
@@ -260,13 +334,11 @@ class SaveLoadTests(unittest.TestCase):
         self.path.write_text("{save interrompido", encoding="utf-8")
         original = self.path.read_bytes()
 
-        def step_to_exit(player, keys, obstacles):
-            if player.x == 1024 and player.y == 576:
-                player.x, player.y = 1990, 575
-
         with patch.object(save_manager, "SAVE_PATH", self.path), \
-             patch.object(main.Player, "update", step_to_exit), \
-             patch.object(pygame.event, "get", side_effect=[[], [pygame.event.Event(pygame.QUIT)]]):
+             patch("story.sequence.NarrativeSequence.update", return_value=True), \
+             patch.object(pygame.event, "get", side_effect=[
+                 [], [pygame.event.Event(pygame.QUIT)]
+             ]):
             self.assertEqual(main.main(), 0)
         self.assertEqual(self.path.read_bytes(), original)
 

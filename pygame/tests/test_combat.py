@@ -378,6 +378,7 @@ class CombatTests(unittest.TestCase):
             with patch.object(main.Player, "update", die_once), \
                  patch.object(main.Player, "start_dash") as dash, \
                  patch.object(main, "restore_player_after_death", wraps=main.restore_player_after_death) as respawn, \
+                 patch("story.sequence.NarrativeSequence.update", return_value=True), \
                  patch.object(main.save_manager, "SAVE_PATH", save_path), \
                  patch.object(pygame.event, "get", side_effect=batches):
                 self.assertEqual(main.main(), 0)

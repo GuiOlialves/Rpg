@@ -7,20 +7,22 @@ import pygame
 def _prepare(region):
     if '_ambient' in region: return region['_ambient']
     kind=region.get('ambient_kind','village')
-    rng=random.Random({'forest':29,'desert':43,'village':17}[kind])
+    rng=random.Random({'forest':29,'desert':43,'village':17,'home':19}.get(kind,17))
     waters=[]
     for zone in region.get('water',[]):
         rect=zone['rect'].inflate(-16,-12)
         for i in range(max(4,rect.width//45)):
             waters.append((rng.randrange(rect.left,rect.right-22),rng.randrange(rect.top,rect.bottom),rng.random()*math.tau,zone['color']))
     centers={'forest':[(240,280),(580,470),(970,940),(1620,700)],
-             'desert':[(490,700),(1420,850),(1830,360)],'village':[(780,480),(1200,896)]}[kind]
+             'desert':[(490,700),(1420,850),(1830,360)],'village':[(780,480),(1200,896)],
+             'home':[]}.get(kind, [])
     particles=[]
     for cx,cy in centers:
         for i in range(3):
             particles.append((cx+rng.randrange(-48,49),cy+rng.randrange(-22,23),rng.random()*9,7+rng.random()*4))
     frames=[]
-    color={'forest':(184,198,110),'desert':(244,210,151),'village':(239,212,151)}[kind]
+    color={'forest':(184,198,110),'desert':(244,210,151),'village':(239,212,151),
+           'home':(239,212,151)}.get(kind, (239,212,151))
     for alpha in range(0,151,15):
         im=pygame.Surface((10,6),pygame.SRCALPHA)
         if kind=='forest': pygame.draw.polygon(im,(*color,alpha),[(1,2),(5,0),(8,2),(4,4)])
@@ -54,7 +56,7 @@ def draw(canvas,region,camera,ticks):
         if not view.collidepoint(px,py): continue
         alpha=round(math.sin(u*math.pi)*10)
         canvas.blit(data['frames'][alpha],(round(px-camera[0]),round(py-camera[1])))
-    if data['kind']=='village':
+    if data['kind']=='village' and region.get('fountain_effect', True):
         x,y=1024-camera[0],512-camera[1]
         if canvas.get_rect().inflate(90,90).collidepoint(x,y):
             for i in range(3):

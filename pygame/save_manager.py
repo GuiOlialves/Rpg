@@ -9,18 +9,20 @@ import tempfile
 
 import pygame
 
-from enemy import Drop
-from equipment import EQUIPMENT, SLOTS, item as equipment_item
-from items import CONSUMABLES, consumable
-from quest import ACTIVE, AVAILABLE, COMPLETED, REWARDED, QuestManager
+from entities.enemy import Drop
+from systems.equipment import EQUIPMENT, SLOTS, item as equipment_item
+from systems.items import CONSUMABLES, consumable
+from systems.quest import ACTIVE, AVAILABLE, COMPLETED, REWARDED, QuestManager
+from story.story_manager import StoryManager
 
 
 SAVE_VERSION = 1
 SAVE_PATH = Path(__file__).with_name("savegame.json")
-REGIONS = {"village", "forest", "desert"}
+REGIONS = {"home", "village", "forest", "desert"}
 CHESTS = {"desert_chest_oasis", "desert_chest_ruins", "desert_chest_hidden"}
 STATS = ("vitalidade", "força", "magia", "agilidade")
 SAFE_SPAWNS = {
+    "home": ((512, 288),),
     "village": ((1024, 576), (1850, 575)),
     "forest": ((120, 575), (1245, 82)),
     "desert": ((1025, 105),),
@@ -45,6 +47,7 @@ class LoadedGame:
     enemies: list
     drops: list
     opened_chests: set
+    story: StoryManager
 
 
 def _object(value, label):
@@ -169,10 +172,32 @@ def validate(data):
         _item_record(drop, f"drops[{index}]", equipment_allowed=False)
         _position(drop.get("position"), f"drops[{index}].position")
         _integer(drop.get("lifetime"), f"drops[{index}].lifetime", 1, 60 * 90)
+    # Saves anteriores ao prólogo representam uma partida já em andamento;
+    # não devem repetir a abertura após a atualização.
+    story = _object(data.get("story", {"woke_up": True}), "story")
+    story_defaults = {
+        "woke_up": True,
+        "saw_silhouette": False,
+        "slime_quest_started": False,
+    }
+    if not set(story).issubset(story_defaults):
+        raise SaveError("Save inválido: flags narrativas desconhecidas.")
+    story = {**story_defaults, **story}
+    for name, value in story.items():
+        _boolean(value, f"story.{name}")
+    data["story"] = story
     return data
 
 
-def snapshot(player, inventory, quests, region_id, opened_chests, drops):
+def snapshot(player, inventory, quests, region_id, opened_chests, drops, story=None):
+    story_defaults = {
+        "woke_up": True,
+        "saw_silhouette": False,
+        "slime_quest_started": False,
+    }
+    supplied_story = (story.to_dict() if isinstance(story, StoryManager) else
+                      dict(story) if isinstance(story, dict) else {})
+    story_flags = {**story_defaults, **supplied_story}
     data = {
         "save_version": SAVE_VERSION,
         "region": region_id,
@@ -195,12 +220,13 @@ def snapshot(player, inventory, quests, region_id, opened_chests, drops):
         },
         "drops": [{"id": drop.item["id"], "amount": drop.item.get("amount", 1),
                    "position": [drop.x, drop.y], "lifetime": drop.lifetime} for drop in drops],
+        "story": story_flags,
     }
     return validate(data)
 
 
-def save_game(player, inventory, quests, region_id, opened_chests, drops, path=None):
-    data = snapshot(player, inventory, quests, region_id, opened_chests, drops)
+def save_game(player, inventory, quests, region_id, opened_chests, drops, path=None, story=None):
+    data = snapshot(player, inventory, quests, region_id, opened_chests, drops, story)
     path = Path(path or SAVE_PATH)
     temporary = None
     try:
@@ -298,4 +324,5 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
     player.x, player.y = _safe_position(tuple(character["position"]), region_id, region, enemies)
     drops = [Drop(consumable(entry["id"], entry["amount"]), *entry["position"], entry["lifetime"])
              for entry in data["drops"]]
-    return LoadedGame(player, inventory, quests, region_id, region, enemies, drops, opened_chests)
+    return LoadedGame(player, inventory, quests, region_id, region, enemies, drops,
+                      opened_chests, StoryManager.from_dict(data["story"]))

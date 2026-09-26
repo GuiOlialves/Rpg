@@ -178,11 +178,12 @@ class AttributeTests(unittest.TestCase):
             ]
             with patch.object(main.Player, "__init__", leveled_player), \
                  patch.object(main.Player, "update", step_to_exit), \
+                 patch("story.sequence.NarrativeSequence.update", return_value=True), \
                  patch.object(save_manager, "SAVE_PATH", path), \
                  patch.object(pygame.event, "get", side_effect=events):
                 self.assertEqual(main.main(), 0)
             saved = save_manager.read_save(path)
-            self.assertEqual(saved["region"], "forest")
+            self.assertEqual(saved["region"], "home")
             self.assertEqual(saved["player"]["stats"]["vitalidade"], 12)
             self.assertEqual(saved["player"]["stats"]["força"], 9)
             self.assertEqual(saved["player"]["stats"]["magia"], 7)

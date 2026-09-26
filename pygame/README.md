@@ -1,8 +1,10 @@
 # O Vale — RPG em Pygame
 
-**Versão 0.13** · RPG 2D top-down desenvolvido em Python com Pygame CE.
+**Versão 0.2** · RPG 2D top-down desenvolvido em Python com Pygame CE.
 
-O jogo reúne exploração, combate e progressão em três áreas conectadas: Vila do Vale, Floresta Mística e Deserto das Dunas. A versão inclui inimigos com animações, NPCs e diálogos, uma missão inicial com chefe, equipamentos, inventário, atributos e salvamento da recompensa dos baús do deserto durante a sessão.
+Veja o [histórico de atualizações](CHANGELOG.md) para um resumo breve de cada versão.
+
+O jogo reúne exploração, combate e progressão em três áreas conectadas: Vila do Vale, Floresta Mística e Deserto das Dunas. A versão inclui inimigos com animações, NPCs e diálogos, a missão inicial dos Slimes, equipamentos, inventário, atributos e salvamento da recompensa dos baús do deserto durante a sessão. O encontro antigo com o Guardião permanece no código, mas não é ativado pela conclusão dessa missão.
 
 ## Executar
 
@@ -29,19 +31,25 @@ python main.py
 | `F5` | Salvar em `savegame.json` |
 | `F9` | Carregar manualmente o save |
 | `F3` | Exibir hitboxes de combate e avisos dos ataques |
+| `F4` | Durante uma cutscene, concluí-la imediatamente (atalho de desenvolvimento; aplica seus efeitos finais) |
 
 Ao chegar a 0 HP, a tela de derrota permite continuar do ponto seguro da região, carregar o último save ou sair. Continuar restaura HP/SP, preserva a progressão e reinicia um encontro ainda não concluído com o Guardião. Não é possível salvar com HP zerado. Consumíveis compartilham uma recarga de 1,5 segundo.
 
 ## Estrutura
 
-- `main.py`: janela, personagem, loop principal e interface.
-- `village.py`, `forest.py` e `desert.py`: composição das regiões.
+- `main.py`: ponto de entrada e fachada de compatibilidade.
+- `core/`: loop/coordenador do jogo, roteamento de input, configuração, assets e câmera.
+- `entities/`: jogador, inimigos, drops e NPCs.
+- `systems/`: combate, diálogo/quests, ações de inventário, itens, equipamentos e progressão.
+- `ui/`: HUD, inventário, menu de personagem, diálogo, derrota e renderização.
+- `world/regions/`: construção da vila, floresta e deserto; `world/world_manager.py` registra builders e resolve transições.
+- `story/`: estrutura serializável de flags narrativas, ainda sem integração ao save.
 - `environment.py` e `ambient.py`: texturas, camadas, sombras e efeitos ambientais.
-- `enemy.py`, `npc.py`, `quest.py`, `equipment.py` e `dialogue.py`: lógica dos sistemas do jogo.
-- `attributes.py`: fórmulas dos quatro atributos, stats de combate, defesa e crítico.
-- `items.py`: IDs e dados dos consumíveis.
 - `save_manager.py`: validação, gravação atômica e restauração do save.
+- `docs/`: design, estrutura narrativa e documentação técnica.
 - `assets/` e `sprites_meu/`: imagens necessárias para executar o projeto.
+
+Os módulos legados na raiz, como `enemy.py` e `forest.py`, permanecem como fachadas para compatibilidade. Consulte `docs/technical/ARCHITECTURE.md` para as responsabilidades e as fachadas que ainda podem ser removidas futuramente.
 
 ## Assets e créditos
 
@@ -49,7 +57,7 @@ Os sprites são mantidos separados do código-fonte e preservam a estrutura de p
 
 ## Estado do projeto
 
-A versão 0.13 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
+A versão 0.2 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
 
 Os quatro atributos afetam HP, SP, ataque, defesa, poder mágico, velocidade, cadência e crítico. O menu `V` mostra os bônus de equipamento, os stats de combate e a prévia de cada ponto ao passar o mouse sobre `+`.
 
