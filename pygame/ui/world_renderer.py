@@ -4,6 +4,7 @@ import ambient
 import environment
 from core.config import VIEW
 from entities.npc import nearest
+from ui.hud import draw_key_prompt, draw_panel
 
 def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=None,
                debug=False, show_controls=True, interaction_context=None, scene_actors=(),
@@ -65,15 +66,16 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
         viewport = pygame.Rect(camera[0], camera[1], VIEW[0], VIEW[1])
         if viewport.colliderect(exit_rect):
             label = "FLORESTA" if exit_name == "forest" else "VILA" if exit_name == "village" else "DESERTO" if exit_name == "desert" else "RUÍNAS"
-            marker = pygame.Surface((150, 28), pygame.SRCALPHA)
-            marker.fill((25, 31, 34, 190))
-            marker.blit(font.render(f"Saída: {label}", True, (239, 222, 169)), (9, 6))
-            canvas.blit(marker, (exit_rect.centerx - camera[0] - 75, exit_rect.top - camera[1] - 34))
+            draw_key_prompt(canvas, f"Saída: {label}", font,
+                            exit_rect.centerx - camera[0],
+                            exit_rect.top - camera[1] - 34)
     if region.get("arena_locked"):
         lock = region["exits"].get("desert")
         if lock:
-            pygame.draw.rect(canvas, (105, 67, 40), lock.move(-camera[0], -camera[1]))
-            canvas.blit(font.render("A passagem está bloqueada", True, (245, 212, 148)), (lock.left - camera[0] - 55, lock.bottom - camera[1] + 8))
+            pygame.draw.rect(canvas, (125, 84, 49), lock.move(-camera[0], -camera[1]), 2)
+            draw_key_prompt(canvas, "Passagem bloqueada", font,
+                            lock.centerx - camera[0],
+                            lock.bottom - camera[1] + 8)
     if show_controls and show_banner:
         draw_region_banner(canvas, region, font)
     targets = (region.get("npcs", []) + [obj for obj in region.get("interactables", [])
@@ -82,16 +84,32 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
                if show_controls else [])
     target = nearest(targets, player, interaction_context) if player is not None else None
     if target is not None:
-        prompt = font.render(getattr(target, "prompt", "[E] Interagir"), True, (250, 235, 170))
-        canvas.blit(prompt, (round(target.x - prompt.get_width()/2 - camera[0]), round(target.y - 94 - camera[1])))
+        prompt_top = round(target.y - camera[1] - 78)
+        prompt_top = max(18, min(canvas.get_height() - font.get_height() - 18,
+                                 prompt_top))
+        draw_key_prompt(canvas, getattr(target, "prompt", "[E] Interagir"), font,
+                        target.x - camera[0], prompt_top)
     if show_controls and region.get("north_locked") and not region.get("arena_locked") and "desert" in region["exits"]:
         lock = region["exits"]["desert"]
-        pygame.draw.rect(canvas, (105, 67, 40), lock.move(-camera[0], -camera[1]))
-        canvas.blit(font.render("A passagem está bloqueada", True, (245, 212, 148)), (lock.left - camera[0] - 55, lock.bottom - camera[1] + 8))
+        pygame.draw.rect(canvas, (125, 84, 49), lock.move(-camera[0], -camera[1]), 2)
+        draw_key_prompt(canvas, "Passagem bloqueada", font,
+                        lock.centerx - camera[0],
+                        lock.bottom - camera[1] + 8)
 
 
 def draw_region_banner(canvas, region, font):
-    panel = pygame.Surface((820, 32), pygame.SRCALPHA)
-    panel.fill((25, 31, 34, 210))
-    panel.blit(font.render(f"{region['name']} | WASD mover | Espaço atacar | Q Dash | E interagir | V personagem | I inventário", True, (235, 222, 185)), (12, 8))
-    canvas.blit(panel, (16, 14))
+    panel_rect = pygame.Rect(16, 12, 842, 36)
+    draw_panel(canvas, panel_rect, fill=(24, 33, 39), radius=6, shadow=True)
+    name_font = pygame.font.Font(None, 22)
+    controls_font = pygame.font.Font(None, 17)
+    name = name_font.render(region["name"].upper(), True, (239, 205, 139))
+    canvas.blit(name, (panel_rect.x + 12,
+                       panel_rect.centery - name.get_height() // 2))
+    divider_x = panel_rect.x + 18 + name.get_width()
+    pygame.draw.line(canvas, (77, 91, 93), (divider_x, panel_rect.y + 8),
+                     (divider_x, panel_rect.bottom - 8), 1)
+    controls = controls_font.render(
+        "WASD mover   ·   Espaço atacar   ·   Q dash   ·   E interagir   ·   V personagem   ·   I inventário",
+        True, (182, 193, 190))
+    canvas.blit(controls, (divider_x + 12,
+                           panel_rect.centery - controls.get_height() // 2))

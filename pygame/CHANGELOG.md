@@ -2,6 +2,13 @@
 
 Resumo breve das mudanças por versão. O histórico reflete os marcos do projeto; versões sem tag Git foram registradas como marcos, não como releases formais.
 
+## 0.21
+
+- HUD, barras de recursos e objetivo atual receberam molduras, espaçamento e hierarquia visual mais consistentes.
+- Menus de personagem e inventário foram reorganizados visualmente, com retratos ampliados e ícones compactos para os itens disponíveis.
+- Diálogos, prompts de interação, overlays narrativos e tela de derrota usam apresentação mais legível e alinhada à paleta da interface.
+- Mantida a composição atual da casa e da Vila, com as correções de props e camadas já presentes na versão 0.2.
+
 ## 0.1 — Base do projeto
 
 - Versão Pygame separada do material do GameMaker e identificada como 0.1; a indicação antiga de 0.5 foi corrigida.

@@ -1,6 +1,8 @@
 """Transição e interface da tela de derrota."""
 import pygame
 
+from ui.hud import ACCENT, TEXT, draw_panel
+
 
 FADE_FRAMES = 36
 OPTIONS = (
@@ -68,10 +70,14 @@ class GameOverScreen:
             return
 
         panel = pygame.Rect(width // 2 - 245, height // 2 - 185, 490, 370)
-        pygame.draw.rect(canvas, (7, 10, 16, 110), panel.move(7, 8), border_radius=18)
-        pygame.draw.rect(canvas, (31, 39, 47), panel, border_radius=16)
-        pygame.draw.rect(canvas, (180, 137, 82), panel, 3, border_radius=16)
-        title = title_font.render("Você caiu...", True, (245, 220, 181))
+        draw_panel(canvas, panel, fill=(25, 34, 40), border=(154, 119, 75),
+                   radius=9, shadow=True)
+        header = pygame.Rect(panel.x + 5, panel.y + 5, panel.width - 10, 106)
+        pygame.draw.rect(canvas, (31, 41, 47), header, border_radius=6)
+        pygame.draw.line(canvas, (78, 91, 91),
+                         (header.x + 20, header.bottom - 1),
+                         (header.right - 20, header.bottom - 1), 1)
+        title = title_font.render("Você caiu...", True, ACCENT)
         canvas.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 28))
         subtitle = font.render("Escolha como deseja continuar", True, (188, 198, 198))
         canvas.blit(subtitle, (panel.centerx - subtitle.get_width() // 2, panel.y + 76))
@@ -79,11 +85,12 @@ class GameOverScreen:
         for index, ((label, _), rect) in enumerate(zip(OPTIONS, self.button_rects((width, height)))):
             hovered = rect.collidepoint(mouse_position)
             active = index == self.selected or hovered
-            fill = (113, 80, 47) if active else (47, 57, 64)
-            border = (242, 203, 131) if active else (93, 106, 110)
-            pygame.draw.rect(canvas, fill, rect, border_radius=8)
-            pygame.draw.rect(canvas, border, rect, 2, border_radius=8)
-            text = font.render(label, True, (255, 247, 226) if active else (209, 215, 212))
+            fill = (111, 83, 48) if active else (37, 47, 52)
+            border = (224, 192, 127) if active else (72, 86, 89)
+            pygame.draw.rect(canvas, fill, rect, border_radius=6)
+            pygame.draw.rect(canvas, border, rect, 2 if active else 1,
+                             border_radius=6)
+            text = font.render(label, True, TEXT if active else (189, 199, 197))
             canvas.blit(text, (rect.centerx - text.get_width() // 2,
                                rect.centery - text.get_height() // 2))
 
@@ -91,5 +98,5 @@ class GameOverScreen:
             notice = font.render(self.notice, True, (246, 151, 137))
             canvas.blit(notice, (panel.centerx - notice.get_width() // 2, panel.bottom - 40))
         else:
-            hint = font.render("↑/↓ selecionar  •  Enter confirmar  •  Esc sair", True, (154, 168, 169))
+            hint = font.render("W/S selecionar  •  Enter confirmar  •  Esc sair", True, (154, 168, 169))
             canvas.blit(hint, (panel.centerx - hint.get_width() // 2, panel.bottom - 31))

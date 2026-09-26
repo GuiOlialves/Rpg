@@ -1,4 +1,4 @@
-"""Compatibilidade pública e ponto de entrada do O Vale (v0.2)."""
+"""Compatibilidade pública e ponto de entrada do O Vale (v0.21)."""
 import random  # preserva o ponto de monkeypatch usado por consumidores antigos
 import sys
 

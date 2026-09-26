@@ -2,9 +2,9 @@
 import pygame
 
 from core.config import VIEW
-from ui.character_menu import draw_character_menu, fit_text
+from ui.character_menu import draw_character_menu
 from ui.coordinates import logical_mouse_position
-from ui.hud import draw_hud
+from ui.hud import draw_bar, draw_hud, draw_notice, draw_objective_tracker
 from ui.inventory_menu import draw_inventory
 from ui.narrative_overlay import draw_narrative
 from ui.world_renderer import draw_world, draw_region_banner
@@ -112,30 +112,21 @@ class GameRenderer:
         if cinematic:
             pygame.draw.rect(canvas, (12, 15, 19), (0, 0, VIEW[0], 20))
             pygame.draw.rect(canvas, (12, 15, 19), (0, VIEW[1] - 20, VIEW[0], 20))
-        elif not dialogue.active:
+        elif not dialogue.active and not cinematic and ui_mode is None:
             draw_hud(canvas, player, font)
         dialogue.draw(canvas, font, title_font)
         quest_text = (story.objective_text if story is not None else "") or quest_manager.active_text()
-        if quest_text and not cinematic and not dialogue.active:
-            objective = font.render(quest_text, True, (244, 224, 166))
-            canvas.blit(objective, (VIEW[0] - objective.get_width() - 16, 52))
-        if quest_manager.notice_timer and not cinematic and not dialogue.active:
-            notice = font.render(fit_text(quest_manager.notice, font, VIEW[0] - 350),
-                                 True, (255, 235, 170))
-            canvas.blit(notice, (16, 52))
+        if quest_text and not cinematic and not dialogue.active and ui_mode is None:
+            draw_objective_tracker(canvas, quest_text, font)
+        if (quest_manager.notice_timer and not cinematic and not dialogue.active
+                and ui_mode is None):
+            draw_notice(canvas, quest_manager.notice, font)
 
         boss = next((enemy for enemy in enemies
                      if enemy.kind == "forest_guardian" and enemy.state != "DEAD"), None)
-        if boss:
-            bar = pygame.Rect(280, 78, 464, 22)
-            pygame.draw.rect(canvas, (25, 25, 28), bar, border_radius=5)
-            pygame.draw.rect(
-                canvas, (166, 50, 62),
-                (bar.x, bar.y, round(bar.width * boss.hp / boss.max_hp), bar.height),
-                border_radius=5)
-            pygame.draw.rect(canvas, (235, 207, 142), bar, 2, border_radius=5)
-            canvas.blit(font.render(f"{boss.name}  {boss.hp}/{boss.max_hp}", True, "white"),
-                        (bar.x + 10, bar.y + 3))
+        if boss and not cinematic and not dialogue.active and ui_mode is None:
+            draw_bar(canvas, pygame.Rect(280, 136, 464, 30), boss.hp,
+                     boss.max_hp, (166, 50, 62), boss.name, font)
 
         mouse = logical_mouse_position(pygame.mouse.get_pos())
         if ui_mode == "character":

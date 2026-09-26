@@ -1,6 +1,6 @@
 # O Vale — RPG em Pygame
 
-**Versão 0.2** · RPG 2D top-down desenvolvido em Python com Pygame CE.
+**Versão 0.21** · RPG 2D top-down desenvolvido em Python com Pygame CE.
 
 Veja o [histórico de atualizações](CHANGELOG.md) para um resumo breve de cada versão.
 
@@ -57,7 +57,7 @@ Os sprites são mantidos separados do código-fonte e preservam a estrutura de p
 
 ## Estado do projeto
 
-A versão 0.2 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
+A versão 0.21 é um projeto em desenvolvimento. O jogo ainda não é distribuído como executável independente; execute-o pelo Python seguindo os passos acima. O carregamento é manual; o autosave acontece ao trocar de região, concluir a quest inicial e derrotar o Guardião. Saves inválidos não são sobrescritos automaticamente.
 
 Os quatro atributos afetam HP, SP, ataque, defesa, poder mágico, velocidade, cadência e crítico. O menu `V` mostra os bônus de equipamento, os stats de combate e a prévia de cada ponto ao passar o mouse sobre `+`.
 
