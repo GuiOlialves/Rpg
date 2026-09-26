@@ -3,6 +3,8 @@ import math
 import random
 import pygame
 import environment as env
+from entities.interactable import Interactable
+from story.blue_march import blue_commander_sprite
 
 WORLD=(2048,1152)
 TREES=[(175,120),(320,245),(525,72),(820,155),(1060,105),(1120,270),(450,410),
@@ -87,6 +89,45 @@ def build(load):
         for j in range(4):
             scenery.append(env.anchored(grass_details[j],(x+j*9-15,y+rng.randrange(-6,7)),False,1,j))
         if x%3==0: scenery.append(env.anchored(bush,(x+22,y-3)))
+
+    blue_idle = load('sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Blue Units/Warrior/Warrior_Idle.png')
+    red_idle = load('sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/Warrior_Idle.png')
+    blue_frame = blue_idle.subsurface((0, 0, 192, 192)).copy()
+    red_frame = red_idle.subsurface((0, 0, 192, 192)).copy()
+    commander_sheet = blue_commander_sprite(load)
+    commander_frame = commander_sheet.subsurface((0, 0, 32, 32)).copy()
+    commander_fallen = pygame.transform.rotate(
+        pygame.transform.scale(commander_frame, (72, 72)), -76)
+    fallen_blue = pygame.transform.rotate(
+        pygame.transform.scale_by(blue_frame, 0.48), 72)
+    blue_sword = pygame.transform.rotate(
+        pygame.transform.scale_by(blue_frame.subsurface((116, 66, 36, 54)), 0.9), 48)
+    blue_shield = pygame.transform.rotate(
+        pygame.transform.scale_by(blue_frame.subsurface((56, 88, 42, 48)), 0.86), -24)
+    red_insignia = pygame.transform.scale(
+        red_frame.subsurface((59, 91, 34, 42)), (24, 30))
+    transparent = pygame.Surface((1, 1), pygame.SRCALPHA)
+    battlefield_body = Interactable(
+        'battlefield_body', 'Protagonista', (310, 565), transparent,
+        ('Eles passaram por mim há pouco tempo.', 'O que aconteceu aqui?'),
+        prompt='[E] Examinar corpo', interaction_radius=76)
+    insignia_prop = Interactable(
+        'red_insignia', 'Protagonista', (1280, 492), red_insignia, (),
+        prompt='[E] Pegar insígnia', interaction_radius=70)
+    battlefield_objects = [
+        (fallen_blue, (246, 541)),
+        (blue_sword, (370, 532)),
+        (blue_shield, (453, 554)),
+        (fallen_blue, (634, 463)),
+        (fallen_blue, (1090, 412)),
+    ]
+    red_encounter_groups = (
+        ((550, 536), (620, 566)),
+        ((790, 488), (852, 470)),
+        ((756, 662), (820, 680)),
+        ((1018, 432), (1080, 453)),
+        ((1228, 470), (1292, 500)),
+    )
     # Nenúfares são pequenos detalhes limpos; os previews de água não são usados.
     lily=pygame.Surface((28,18),pygame.SRCALPHA)
     pygame.draw.ellipse(lily,(48,105,94),(0,4,27,13))
@@ -105,4 +146,14 @@ def build(load):
             'enemy_spawns': [('slime',(560,365)),('slime',(820,300)),('slime',(530,760)),
                              ('slime',(1120,690)),('slime',(960,560))],
             'future_enemy_spawns': {'forest_post_army': [('warrior',(720,835)),
-                                                          ('warrior',(1530,590))]}}
+                                                          ('warrior',(1530,590))]},
+            'forest_battlefield_objects': battlefield_objects,
+            'forest_battlefield_interactables': {
+                'body': battlefield_body, 'insignia': insignia_prop},
+            'red_encounter_groups': red_encounter_groups,
+            'wounded_commander_object': (
+                commander_fallen,
+                (1460 - commander_fallen.get_width() // 2,
+                 520 - commander_fallen.get_height() // 2)),
+            'wounded_commander_sprite': commander_sheet,
+            'red_officer_trigger': (1460, 520)}

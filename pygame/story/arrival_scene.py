@@ -12,9 +12,9 @@ RESIDENT_DIALOGUES = {
     "AVAILABLE": ("Os Slimes estão perto demais. Ainda precisamos de ajuda.",),
     "ACTIVE": ("Você ainda está aqui? Não quero apressar você.",
                "Eles estavam muito perto da vila."),
-    "COMPLETED": ("Você voltou. Parece que o perigo imediato passou.",
-                  "Precisamos entender o que aconteceu."),
-    "REWARDED": ("Obrigado por ter voltado em segurança.",),
+    "COMPLETED": ("Você voltou. Então conseguiu. Talvez agora possamos respirar um pouco.",
+                  "Alden está perto da saída para a floresta. Vá falar com ele."),
+    "REWARDED": ("Obrigado pela ajuda com os Slimes. Podemos respirar um pouco agora.",),
 }
 
 

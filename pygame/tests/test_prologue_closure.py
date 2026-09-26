@@ -143,11 +143,11 @@ class PrologueClosureTests(unittest.TestCase):
                               state["seen"])
                 saved = save_manager.read_save(path)
                 self.assertEqual(saved["region"], "home" if direction == "enter" else "village")
-                self.assertEqual(saved["story"], {
-                    "woke_up": True,
-                    "saw_silhouette": True,
-                    "slime_quest_started": True,
-                })
+                self.assertTrue(saved["story"]["woke_up"])
+                self.assertTrue(saved["story"]["saw_silhouette"])
+                self.assertTrue(saved["story"]["slime_quest_started"])
+                self.assertFalse(saved["story"]["blue_army_departed"])
+                self.assertFalse(saved["story"]["red_officer_met"])
                 self.assertEqual(saved["quests"]["forest_trouble"]["state"], ACTIVE)
                 self.assertEqual(saved["quests"]["forest_trouble"]["progress"], 2)
 

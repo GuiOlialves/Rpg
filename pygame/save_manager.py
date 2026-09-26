@@ -179,12 +179,46 @@ def validate(data):
         "woke_up": True,
         "saw_silhouette": False,
         "slime_quest_started": False,
+        "blue_army_departed": False,
+        "red_officer_met": False,
     }
-    if not set(story).issubset(story_defaults):
+    # New optional flags default to False through StoryManager.get(), keeping
+    # the existing prologue/legacy save shape until the conversation completes.
+    known_flags = set(story_defaults) | {
+        "alden_post_slimes_talk", "house_investigation_unlocked",
+        "pendant_found", "house_searched",
+        "blue_army_departed",
+        "forest_massacre_discovered", "red_insignia_found",
+        "forest_battle_progress", "red_officer_met",
+    }
+    if not set(story).issubset(known_flags):
         raise SaveError("Save inválido: flags narrativas desconhecidas.")
     story = {**story_defaults, **story}
     for name, value in story.items():
-        _boolean(value, f"story.{name}")
+        if name == "forest_battle_progress":
+            _integer(value, "story.forest_battle_progress", 0, 10)
+        else:
+            _boolean(value, f"story.{name}")
+    talked = story.get("alden_post_slimes_talk", False)
+    unlocked = story.get("house_investigation_unlocked", False)
+    if talked != unlocked or (talked and quest_data["forest_trouble"]["state"] != REWARDED):
+        raise SaveError("Save inválido: conversa com Alden e investigação inconsistentes.")
+    pendant_found = story.get("pendant_found", False)
+    house_searched = story.get("house_searched", False)
+    if ((house_searched and not pendant_found)
+            or (pendant_found and not unlocked)):
+        raise SaveError("Save inválido: pingente e investigação da casa inconsistentes.")
+    if story.get("blue_army_departed", False) and not house_searched:
+        raise SaveError("Save inválido: marcha azul antes da investigação da casa.")
+    battle_progress = story.get("forest_battle_progress", 0)
+    if ((story.get("forest_massacre_discovered", False) or battle_progress > 0
+         or story.get("red_insignia_found", False))
+            and not story.get("blue_army_departed", False)):
+        raise SaveError("Save inválido: batalha da Floresta antes da marcha azul.")
+    if story.get("red_insignia_found", False) and battle_progress < 10:
+        raise SaveError("Save inválido: insígnia obtida antes do fim dos confrontos.")
+    if story.get("red_officer_met", False) and not story.get("red_insignia_found", False):
+        raise SaveError("Save inválido: encontro com o Oficial antes da insígnia.")
     data["story"] = story
     return data
 
@@ -194,6 +228,8 @@ def snapshot(player, inventory, quests, region_id, opened_chests, drops, story=N
         "woke_up": True,
         "saw_silhouette": False,
         "slime_quest_started": False,
+        "blue_army_departed": False,
+        "red_officer_met": False,
     }
     supplied_story = (story.to_dict() if isinstance(story, StoryManager) else
                       dict(story) if isinstance(story, dict) else {})
@@ -321,8 +357,13 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
     region_id = data["region"]
     region, enemies = prepare_region(region_id, quests, opened_chests, build_region,
                                      spawn_enemies, guardian_factory)
+    story = StoryManager.from_dict(data["story"])
+    story.apply_to_region(region)
+    if (region_id == "forest" and story.get("blue_army_departed")
+            and not quests.forest_event_started):
+        enemies = []
     player.x, player.y = _safe_position(tuple(character["position"]), region_id, region, enemies)
     drops = [Drop(consumable(entry["id"], entry["amount"]), *entry["position"], entry["lifetime"])
              for entry in data["drops"]]
     return LoadedGame(player, inventory, quests, region_id, region, enemies, drops,
-                      opened_chests, StoryManager.from_dict(data["story"]))
+                      opened_chests, story)

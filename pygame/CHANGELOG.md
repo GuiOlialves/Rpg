@@ -29,5 +29,8 @@ Resumo breve das mudanças por versão. O histórico reflete os marcos do projet
 
 - Refatoração incremental da estrutura em `core/`, `entities/`, `systems/`, `story/`, `world/` e `ui/`, preservando `python main.py` e os saves existentes.
 - Prólogo 1: abertura, despertar, exploração da casa, silhueta, chegada do morador e ativação da missão dos Slimes.
+- Continuação do prólogo (2A–2E): retorno após os Slimes, conversa com Alden, investigação da casa e primeira memória do pingente; marcha azul, campo de batalha na Floresta, insígnia vermelha e encontro com o Oficial Vermelho.
+- Flags narrativas e progresso do prólogo preservados no Save/Load; F4 conclui as sequências roteirizadas em estado consistente.
 - Polimento visual da casa e da Vila, catálogo e reutilização de assets existentes.
+- Ajuste local de props, footprints e camadas na casa e na praça da Vila.
 - Reentrada funcional na casa, colisões das construções mais precisas, correção do alinhamento dos sprites civis e regressões de Save/Load, skip e progressão da primeira Floresta.

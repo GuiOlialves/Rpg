@@ -53,6 +53,7 @@ class QuestManager:
     def active_text(self):
         for q in self.quests.values():
             if q.state == ACTIVE: return f"{q.name}  |  Slimes: {q.progress}/{q.required}"
+            if q.state == COMPLETED: return f"Slimes: {q.progress}/{q.required}  |  Volte à Vila e fale com Alden."
         return ""
 
     def forest_ready(self):

@@ -23,6 +23,16 @@ ENEMY_CONFIGS = {
         "attack_frames": 4, "hurt_frames": 1, "death_frames": 1,
         "drop": {"id": "ether", "chance": 0.45, "min": 1, "max": 1}, "xp_reward": 42,
     },
+    "red_soldier": {
+        "name": "Soldado Vermelho", "faction": "red", "scripted_encounter": True,
+        "max_hp": 62, "damage": 6, "speed": 1.42,
+        "perception": 260, "attack_range": 76, "cooldown": 78,
+        "frame_size": 192, "scale": 0.43, "hitbox_radius": 20,
+        "idle_frames": 8, "move_frames": 6, "attack_frames": 4,
+        "hurt_frames": 1, "death_frames": 1,
+        "drop": {"id": "herb", "chance": 0.0, "min": 1, "max": 1},
+        "xp_reward": 28,
+    },
     "forest_guardian": {
         "name": "Guardião da Clareira", "max_hp": 180, "damage": 12, "speed": 0.9,
         "perception": 420, "attack_range": 92, "cooldown": 26,
@@ -81,6 +91,8 @@ class Enemy:
         self.kind = kind
         self.config = ENEMY_CONFIGS[kind]
         self.name = self.config["name"]
+        self.faction = self.config.get("faction")
+        self.scripted_encounter = self.config.get("scripted_encounter", False)
         self.x, self.y = map(float, position)
         self.spawn_x, self.spawn_y = self.x, self.y
         self.max_hp = self.hp = self.config["max_hp"]
@@ -327,10 +339,10 @@ class Enemy:
         force = (0.45 if special else 0.75 if self.kind == "forest_guardian"
                  else 2.6 if self.kind == "slime" else 1.7) * knockback
         self.knockback_x, self.knockback_y = math.cos(angle) * force, math.sin(angle) * force
-        self.hit_resistance_timer = {"slime": 5, "warrior": 11, "forest_guardian": 13,
+        self.hit_resistance_timer = {"slime": 5, "warrior": 11, "red_soldier": 9, "forest_guardian": 13,
                                      "desert_scout": 8, "dune_lancer": 11}[self.kind]
         if not special:
-            self.hurt_timer = {"slime": 9, "warrior": 8, "forest_guardian": 6,
+            self.hurt_timer = {"slime": 9, "warrior": 8, "red_soldier": 8, "forest_guardian": 6,
                                "desert_scout": 7, "dune_lancer": 8}[self.kind]
             self.state = "HURT"
             self.attack_zone = None

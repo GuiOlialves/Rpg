@@ -34,7 +34,6 @@ def build():
         terrain.blit(wall_tile, (8, y))
         terrain.blit(wall_tile, (width - 40, y))
     terrain.blit(piece(interior, (0, 272, 108, 98), scale=1, isolate=True), (460, 303))
-    terrain.blit(piece(interior, (126, 288, 54, 82), scale=1), (805, 340))
     terrain.blit(piece(walls, (86, 66, 18, 24)), (650, 34))
     terrain.blit(piece(walls, (86, 66, 18, 24)), (365, 34))
     light = pygame.Surface(VIEW, pygame.SRCALPHA)
@@ -64,8 +63,9 @@ def build():
     furniture((112, 80, 48, 48), (748, 48), (6, 76, 82, 15))
     furniture((120, 4, 20, 28), (554, 172), (6, 37, 24, 15))
     furniture((112, 176, 48, 32), (817, 382), (8, 34, 80, 18))
-    furniture((0, 240, 16, 32), (826, 347), (3, 42, 22, 14))
-    furniture((16, 240, 16, 32), (881, 435), (3, 42, 22, 14))
+    # These chair crops stop before the atlas's rug row below them.
+    furniture((8, 216, 16, 24), (785, 347), (3, 34, 22, 14))
+    furniture((36, 216, 16, 24), (916, 392), (3, 34, 22, 14))
     furniture((48, 48, 32, 32), (104, 430), (5, 43, 49, 17))
     furniture((152, 0, 28, 32), (162, 429), (10, 42, 29, 17))
     furniture((36, 368, 24, 32), (88, 325), (8, 47, 26, 12))
@@ -80,27 +80,79 @@ def build():
         mirror_pixels.replace(source, target)
     del mirror_pixels
     mirror = Interactable(
-        "mirror", "Protagonista", (252, 191), mirror_art,
+        "mirror", "Protagonista", (58, 222), mirror_art,
         ["Esse sou eu?", "Não sinto que estou olhando para um estranho.",
          "Mas também não lembro desse rosto."], interaction_radius=70)
     sword = Interactable(
-        "sword", "Protagonista", (757, 313), piece(interior, (148, 134, 34, 36)),
+        "sword", "Protagonista", (950, 238),
+        piece(interior, (104, 368, 28, 14), scale=2),
         ["Sei como segurar isso.", "Só não sei quem me ensinou."], interaction_radius=70)
     door = Interactable(
         "house_door", "Protagonista", (512, 500), piece(walls, (112, 96, 32, 32)),
         ["Talvez alguém aqui saiba alguma coisa."], prompt="[E] Sair",
         interaction_radius=82, transition_to="village")
-    mirror.visual_depth, sword.visual_depth, door.visual_depth = 228, 337, 457
+    mirror.visual_depth, sword.visual_depth, door.visual_depth = 40, 40, 457
     door_frame = pygame.Surface((64, 88), pygame.SRCALPHA)
     door_frame.blit(door.image, (0, 24))
     door.image = door_frame
-    obstacles.append(pygame.Rect(734, 331, 46, 24))
+
+    def hotspot(uid, position, lines, radius=76):
+        return Interactable(
+            uid, "Protagonista", position, pygame.Surface((1, 1), pygame.SRCALPHA),
+            lines, interaction_radius=radius)
+
+    # Reuse atlas props; the pack has no standalone paper graphic.
+    mug = piece(interior, (80, 372, 20, 24), scale=1)
+    pendant = piece(interior, (176, 368, 16, 28), scale=1)
+
+    wall_font = pygame.font.Font(None, 15)
+    height_marks = pygame.Surface((173, 17), pygame.SRCALPHA)
+    height_marks.blit(wall_font.render("|  |   | |  ***** — 8 anos", True,
+                                       (205, 187, 151)), (0, 0))
+    # No standalone letter art exists in this pack; a small parchment prop fits the table.
+    letter_image = pygame.Surface((34, 22), pygame.SRCALPHA)
+    letter_image.fill((214, 196, 153))
+    pygame.draw.rect(letter_image, (111, 82, 52), letter_image.get_rect(), 1)
+    for row, width_px in ((5, 25), (9, 22), (13, 24), (17, 17)):
+        pygame.draw.line(letter_image, (116, 88, 59), (4, row), (4 + width_px, row), 1)
+
+    mug_point = Interactable("second_mug", "Protagonista", (841, 401), mug,
+                             (), interaction_radius=38)
+    mug_point.visual_depth = 437
+    letter_point = Interactable(
+        "damaged_letter", "Protagonista", (871, 400), letter_image,
+        ("Se você conseguir chegar ao Vale, não deixe que eles...",
+         "Chegar ao Vale...", "Então alguém sabia que eu viria para cá."),
+        interaction_radius=38)
+    letter_point.visual_depth = 438
+    height_point = Interactable(
+        "height_marks", "Protagonista", (525, 32), height_marks,
+        ("Consigo ler tudo.", "...", "Menos isso."), interaction_radius=72)
+    height_point.visual_depth = 40
+    pendant_point = Interactable(
+        "broken_pendant", "Protagonista", (898, 404), pendant,
+        (), interaction_radius=74)
+    pendant_point.visual_depth = 439
+    investigation_interactables = [
+        hotspot("two_chairs", (856, 414),
+                ("Duas.", "...", "Eu costumava sentar aqui.", "...", "Como sei disso?"), 78),
+        mug_point,
+        height_point,
+        letter_point,
+        pendant_point,
+    ]
+    investigation_objects = []
+
     lighting = pygame.Surface(VIEW, pygame.SRCALPHA)
     for inset in range(0, 64, 4):
         pygame.draw.rect(lighting, (16, 21, 30, round(34 * (1 - inset / 64))),
                          (inset, inset, width - inset * 2, height - inset * 2), 4)
     return {"name": "Casa", "terrain": terrain, "ambient_kind": "home",
+            "story_phase": "home_initial",
             "houses": [], "objects": objects, "nature": [], "obstacles": obstacles,
             "exits": {}, "spawn": {"village": (512, 288)},
             "enemy_spawns": [], "npcs": [],
-            "interactables": [mirror, sword, door], "water": [], "lighting": lighting}
+            "interactables": [mirror, sword, door],
+            "investigation_interactables": investigation_interactables,
+            "investigation_objects": investigation_objects,
+            "water": [], "lighting": lighting}

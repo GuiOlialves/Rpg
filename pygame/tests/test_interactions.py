@@ -68,7 +68,7 @@ class InteractionTests(unittest.TestCase):
 
         def move_between_examinables(player, keys, obstacles):
             movement_frames[0] += 1
-            positions = {1: (300, 260), 2: (690, 313), 3: (512, 470)}
+            positions = {1: (100, 222), 2: (900, 238), 3: (512, 470)}
             if movement_frames[0] in positions:
                 player.x, player.y = positions[movement_frames[0]]
 
@@ -208,6 +208,7 @@ class InteractionTests(unittest.TestCase):
         walk(pygame.K_a, 25)
         walk(pygame.K_w, 12)
         walk(pygame.K_a, 44)
+        walk(pygame.K_a, 65)
         mirror, sword, door = home["interactables"]
         self.assertIs(nearest([mirror], player), mirror)
 
@@ -215,11 +216,12 @@ class InteractionTests(unittest.TestCase):
         walk(pygame.K_w, 100)
         self.assertLessEqual(player.y, 51)
         player.x, player.y = 320, 269
-        walk(pygame.K_d, 130)
+        walk(pygame.K_d, 180)
         self.assertIs(nearest([sword], player), sword)
         walk(pygame.K_a, 12)
+        walk(pygame.K_a, 30)
         walk(pygame.K_s, 100)
-        walk(pygame.K_a, 60)
+        walk(pygame.K_a, 65)
         self.assertIs(nearest([door], player), door)
 
 

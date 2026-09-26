@@ -17,6 +17,13 @@ from systems.quest import QuestManager
 from story.fade import FadeOverlay
 from story.prologue import opening_sequence
 from story.arrival_scene import ArrivalScene, restore_resident
+from story.alden_scene import interact_with_alden
+from story.house_memory import HouseMemoryScene
+from story.blue_march import BlueMarchScene
+from story.forest_battle import (
+    InsigniaMemoryScene, RedAmbushScene, spawn_red_group,
+)
+from story.forest_confrontation import RedOfficerScene
 from story.story_manager import StoryManager
 from ui import defeat_screen as game_over
 from ui.character_menu import attribute_key_at
@@ -47,13 +54,25 @@ class Game:
             "woke_up": False,
             "saw_silhouette": False,
             "slime_quest_started": False,
+            "blue_army_departed": False,
+            "forest_massacre_discovered": False,
+            "red_insignia_found": False,
+            "red_officer_met": False,
+            "forest_battle_progress": 0,
         })
         narrative = opening_sequence()
         transition_fade = FadeOverlay()
         area_transition = None
         arrival_scene = None
+        alden_scene = None
+        house_memory_scene = None
+        blue_march_scene = None
+        forest_ambush_scene = None
+        insignia_memory_scene = None
+        red_officer_scene = None
         current_region = "home"
         region = build_region(current_region)
+        story.apply_to_region(region)
         player.x, player.y = 512, 288
         enemies = spawn_enemies(region)
         drops = []
@@ -80,11 +99,29 @@ class Game:
                 quest_manager.notice = "Save inválido encontrado. Autosave pausado; F5 para substituir."
                 quest_manager.notice_timer = 360
 
+        def apply_story_region(region_id, story_region, region_enemies):
+            story.apply_to_region(story_region)
+            if (region_id == "forest" and story.get("blue_army_departed")
+                    and not quest_manager.forest_event_started):
+                if story.get("red_insignia_found"):
+                    return []
+                progress = story.get("forest_battle_progress", 0)
+                if progress % 2:
+                    return spawn_red_group(progress // 2, story_region, load)
+                return []
+            return region_enemies
+
+        def spawn_forest_red_group(index):
+            return spawn_red_group(index, region, load)
+
         def load_last_save():
             nonlocal player, inventory, quest_manager, current_region, region, enemies
             nonlocal drops, opened_desert_chests, damage_numbers, hitstop_frames
             nonlocal dialogue, ui_mode, inventory_ui, autosave_allowed, game_over_screen
-            nonlocal story, narrative, arrival_scene
+            nonlocal story, narrative, arrival_scene, alden_scene, house_memory_scene
+            nonlocal blue_march_scene
+            nonlocal forest_ambush_scene, insignia_memory_scene
+            nonlocal red_officer_scene
             try:
                 loaded = save_manager.load_game(
                     save_manager.SAVE_PATH,
@@ -104,6 +141,12 @@ class Game:
             current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
             story = loaded.story
             arrival_scene = None
+            alden_scene = None
+            house_memory_scene = None
+            blue_march_scene = None
+            forest_ambush_scene = None
+            insignia_memory_scene = None
+            red_officer_scene = None
             if current_region == "village" and story.get("slime_quest_started"):
                 restore_resident(region, load("assets/npc/civilian_customer.png"))
             if not story.get("woke_up"):
@@ -114,6 +157,7 @@ class Game:
                 narrative = opening_sequence()
             else:
                 narrative = None
+            enemies = apply_story_region(current_region, region, enemies)
             drops, opened_desert_chests = loaded.drops, loaded.opened_chests
             damage_numbers = []
             hitstop_frames = 0
@@ -193,6 +237,9 @@ class Game:
                     else:
                         current_region = result.region_id
                         region, enemies = result.region, result.enemies
+                        enemies = apply_story_region(current_region, region, enemies)
+                        if current_region == "village" and story.get("slime_quest_started"):
+                            restore_resident(region, load("assets/npc/civilian_customer.png"))
                         drops, damage_numbers = [], []
                         player.x, player.y = result.spawn
                         player.attack_timer = player.attack_cooldown_timer = 0
@@ -206,6 +253,10 @@ class Game:
                     source = area_transition["source"]
                     area_transition = None
                     if (source == "home" and current_region == "village"
+                            and story.get("house_searched")
+                            and not story.get("blue_army_departed")):
+                        blue_march_scene = BlueMarchScene(player, dialogue, load)
+                    elif (source == "home" and current_region == "village"
                             and story.get("woke_up")
                             and not story.get("saw_silhouette")):
                         idle_sprite = load("assets/npc/civilian_customer.png")
@@ -237,6 +288,70 @@ class Game:
                     elif (event.type == pygame.KEYDOWN and event.key == pygame.K_e
                           and arrival_scene.phase == "dialogue" and dialogue.active):
                         dialogue_system.advance(dialogue, quest_manager, inventory)
+                    continue
+                if alden_scene is not None and alden_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                        autosave_pending |= alden_scene.finish(
+                            dialogue, story, quest_manager, inventory)
+                        alden_scene = None
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        alden_scene.advance(dialogue)
+                    continue
+                if house_memory_scene is not None and house_memory_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                        autosave_pending |= house_memory_scene.finish(story, region)
+                        house_memory_scene = None
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        house_memory_scene.advance()
+                    continue
+                if blue_march_scene is not None and blue_march_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                        autosave_pending |= blue_march_scene.finish(story, dialogue)
+                        blue_march_scene = None
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        blue_march_scene.advance()
+                    continue
+                if forest_ambush_scene is not None and forest_ambush_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                        if forest_ambush_scene.finish(dialogue, story):
+                            enemies = spawn_forest_red_group(0)
+                            autosave_pending = True
+                        forest_ambush_scene = None
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        if forest_ambush_scene.advance():
+                            forest_ambush_scene.finish(dialogue, story)
+                            enemies = spawn_forest_red_group(0)
+                            autosave_pending = True
+                            forest_ambush_scene = None
+                    continue
+                if insignia_memory_scene is not None and insignia_memory_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                        autosave_pending |= insignia_memory_scene.finish(story, region)
+                        insignia_memory_scene = None
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        insignia_memory_scene.advance()
+                    continue
+                if red_officer_scene is not None and red_officer_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                        if red_officer_scene.finish():
+                            autosave_pending = True
+                        red_officer_scene = None
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        if red_officer_scene.advance():
+                            autosave_pending = True
+                            red_officer_scene = None
                     continue
                 command = input_handler.route(
                     event, ui_mode=ui_mode, dialogue=dialogue, player=player,
@@ -293,7 +408,38 @@ class Game:
                             obj for obj in region.get("interactables", []) if not obj.opened]
                         target = nearest(targets, player, quest_manager)
                         if target is not None:
-                            if getattr(target, "transition_on_interact", False):
+                            if (current_region == "forest" and target.uid == "battlefield_body"
+                                    and not story.get("forest_massacre_discovered")):
+                                story.set("forest_massacre_discovered")
+                                region["interactables"] = [
+                                    obj for obj in region["interactables"]
+                                    if obj.uid != "battlefield_body"]
+                                target.begin_interaction(dialogue, player, quest_manager)
+                                autosave_pending = True
+                            elif (current_region == "forest" and target.uid == "red_insignia"
+                                  and not story.get("red_insignia_found")):
+                                region["interactables"] = [
+                                    obj for obj in region["interactables"]
+                                    if obj.uid != "red_insignia"]
+                                insignia_memory_scene = InsigniaMemoryScene(
+                                    player, target.image, dialogue, load)
+                            elif current_region == "village" and target.uid == "alden":
+                                alden_scene = interact_with_alden(
+                                    target, player, dialogue, quest_manager, story)
+                            elif (current_region == "home" and target.uid == "broken_pendant"
+                                  and story.get("house_investigation_unlocked")
+                                  and not story.get("pendant_found")):
+                                story.set("pendant_found")
+                                region["interactables"] = [
+                                    obj for obj in region["interactables"]
+                                    if obj.uid != "broken_pendant"]
+                                house_memory_scene = HouseMemoryScene(
+                                    "pendant", player, target.image, dialogue)
+                            elif (current_region == "home" and target.uid == "second_mug"
+                                  and story.get("house_investigation_unlocked")):
+                                house_memory_scene = HouseMemoryScene(
+                                    "cup", player, target.image, dialogue)
+                            elif getattr(target, "transition_on_interact", False):
                                 begin_area_transition(target.transition_to)
                             elif hasattr(target, "begin_interaction"):
                                 target.begin_interaction(dialogue, player, quest_manager)
@@ -326,6 +472,28 @@ class Game:
             elif arrival_scene is not None and arrival_scene.active:
                 if arrival_scene.update(delta_ms, dialogue, story):
                     autosave_pending |= complete_arrival()
+            elif alden_scene is not None and alden_scene.active:
+                if alden_scene.update(delta_ms, dialogue, story, quest_manager, inventory):
+                    autosave_pending = True
+                    alden_scene = None
+            elif house_memory_scene is not None and house_memory_scene.active:
+                if house_memory_scene.update(delta_ms, story, region):
+                    autosave_pending = True
+                    house_memory_scene = None
+            elif blue_march_scene is not None and blue_march_scene.active:
+                if blue_march_scene.update(delta_ms, story):
+                    autosave_pending = True
+                    blue_march_scene = None
+            elif forest_ambush_scene is not None and forest_ambush_scene.active:
+                pass
+            elif insignia_memory_scene is not None and insignia_memory_scene.active:
+                if insignia_memory_scene.update(delta_ms, story, region):
+                    autosave_pending = True
+                    insignia_memory_scene = None
+            elif red_officer_scene is not None and red_officer_scene.active:
+                if red_officer_scene.update(delta_ms):
+                    autosave_pending = True
+                    red_officer_scene = None
             elif game_over_screen is not None:
                 pass
             elif hitstop_frames > 0:
@@ -346,6 +514,37 @@ class Game:
                     ui_mode = None
                     dialogue.npc = None
                     hitstop_frames = 0
+                if (current_region == "forest" and story.get("blue_army_departed")
+                        and not story.get("red_insignia_found")
+                        and not quest_manager.forest_event_started
+                        and player.hp > 0 and game_over_screen is None):
+                    progress = story.get("forest_battle_progress", 0)
+                    if progress % 2 and not enemies:
+                        story.set_forest_battle_progress(progress + 1)
+                        story.apply_to_region(region)
+                        autosave_pending = True
+                        progress += 1
+                    if progress < 10 and progress % 2 == 0:
+                        group_index = progress // 2
+                        group = region["red_encounter_groups"][group_index]
+                        trigger_x = sum(position[0] for position in group) / len(group)
+                        trigger_y = sum(position[1] for position in group) / len(group)
+                        if abs(player.x - trigger_x) ** 2 + abs(player.y - trigger_y) ** 2 <= 158 ** 2:
+                            if group_index == 0:
+                                forest_ambush_scene = RedAmbushScene(
+                                    player, dialogue, load, group)
+                            else:
+                                story.set_forest_battle_progress(progress + 1)
+                                enemies = spawn_forest_red_group(group_index)
+                                autosave_pending = True
+                if (current_region == "forest" and story.get("red_insignia_found")
+                        and not story.get("red_officer_met") and not enemies
+                        and player.hp > 0 and game_over_screen is None):
+                    trigger_x, trigger_y = region["red_officer_trigger"]
+                    if ((player.x - trigger_x) ** 2 + (player.y - trigger_y) ** 2
+                            <= 108 ** 2):
+                        red_officer_scene = RedOfficerScene(
+                            player, dialogue, story, region, load)
                 for destination, exit_rect in (region["exits"].items() if player.hp > 0 else ()):
                     if player.hitbox.colliderect(exit_rect):
                         transition = self.world.transition(
@@ -363,6 +562,7 @@ class Game:
                         previous_region = current_region
                         current_region = transition.region_id
                         region, enemies = transition.region, transition.enemies
+                        enemies = apply_story_region(current_region, region, enemies)
                         if current_region == "village" and story.get("slime_quest_started"):
                             restore_resident(region, load("assets/npc/civilian_customer.png"))
                         drops = []
@@ -389,6 +589,11 @@ class Game:
                 dialogue=dialogue, quest_manager=quest_manager, ui_mode=ui_mode,
                 inventory=inventory, inventory_ui=inventory_ui,
                 game_over_screen=game_over_screen, narrative=narrative,
-                transition_fade=transition_fade, arrival_scene=arrival_scene)
+                transition_fade=transition_fade, arrival_scene=arrival_scene,
+                alden_scene=alden_scene, house_memory_scene=house_memory_scene,
+                blue_march_scene=blue_march_scene,
+                forest_ambush_scene=forest_ambush_scene,
+                insignia_memory_scene=insignia_memory_scene,
+                red_officer_scene=red_officer_scene, story=story)
             pygame.transform.scale(canvas, WINDOW, screen); pygame.display.flip()
         pygame.quit(); return 0

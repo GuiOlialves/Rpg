@@ -35,8 +35,8 @@ def terrain(size, asset):
     # Um piso gasto sob as bancas liga comércio e horta à estrada.
     env.paths(ground,[],paving,55,[((1388,665),(245,70))])
     # Horta ao lado da feira: sulcos e folhas em fileiras.
-    pygame.draw.rect(ground, (100, 77, 48), (1350, 650, 155, 85), border_radius=6)
-    for y in range(661, 730, 17):
+    pygame.draw.rect(ground, (100, 77, 48), (1350, 710, 155, 46), border_radius=6)
+    for y in (720, 737):
         pygame.draw.line(ground, (72, 59, 41), (1358, y + 7), (1497, y + 7), 3)
         for x in range(1361, 1495, 16):
             pygame.draw.ellipse(ground, (52, 98, 58), (x, y, 10, 7))
@@ -93,7 +93,7 @@ def build(asset, flowerbed, sign, load):
         solid(im, pos, (9, im.get_height() - 24, im.get_width() - 18, 20))
         for j in range(3):
             objects.append((asset(f'2 Objects/4 Box/{j + 1}.png'), (pos[0] + j * 23, pos[1] + 67)))
-    objects.append((sign(), (1240, 640)))
+    objects.append((sign(), (1200, 640)))
     for i, (x, y) in enumerate([(735, 465), (1175, 471), (731, 808), (1180, 887), (864, 694), (1075, 696)]):
         nature.append((flowerbed(i), (x, y)))
     # Objetos junto às paredes, contidos no footprint sólido existente das casas.
@@ -106,7 +106,7 @@ def build(asset, flowerbed, sign, load):
             nature.append((plant,(x+5+j*(house.width-20),y+house.height-19)))
     objects.append((env.resize(asset('2 Objects/3 Decor/1.png'),1.5),(1490,608)))
     objects.append((env.resize(asset('2 Objects/3 Decor/6.png'),1.5),(1330,716)))
-    for pos, width in [((698, 640), 120), ((842, 640), 66), ((1305, 757), 208), ((1315, 622), 62)]:
+    for pos, width in [((698, 640), 120), ((842, 640), 60), ((1305, 757), 208)]:
         solid(picket(width), pos, (0, 27, width, 6))
     # Front garden frames the starting house without crossing the exit lane.
     for pos, width in [((412, 456), 72), ((587, 456), 64)]:

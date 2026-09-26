@@ -4,7 +4,7 @@
 
 Veja o [histórico de atualizações](CHANGELOG.md) para um resumo breve de cada versão.
 
-O jogo reúne exploração, combate e progressão em três áreas conectadas: Vila do Vale, Floresta Mística e Deserto das Dunas. A versão inclui inimigos com animações, NPCs e diálogos, a missão inicial dos Slimes, equipamentos, inventário, atributos e salvamento da recompensa dos baús do deserto durante a sessão. O encontro antigo com o Guardião permanece no código, mas não é ativado pela conclusão dessa missão.
+O jogo reúne exploração, combate e progressão em três áreas conectadas: Vila do Vale, Floresta Mística e Deserto das Dunas. O prólogo acompanha o protagonista da missão dos Slimes até o encontro com o Oficial Vermelho, passando pela investigação da casa e pelas primeiras memórias. A versão também inclui equipamentos, inventário, atributos e salvamento da recompensa dos baús do deserto durante a sessão. O encontro antigo com o Guardião permanece no código, mas não é ativado pela conclusão da missão inicial.
 
 ## Executar
 
@@ -43,7 +43,7 @@ Ao chegar a 0 HP, a tela de derrota permite continuar do ponto seguro da região
 - `systems/`: combate, diálogo/quests, ações de inventário, itens, equipamentos e progressão.
 - `ui/`: HUD, inventário, menu de personagem, diálogo, derrota e renderização.
 - `world/regions/`: construção da vila, floresta e deserto; `world/world_manager.py` registra builders e resolve transições.
-- `story/`: estrutura serializável de flags narrativas, ainda sem integração ao save.
+- `story/`: sequências do prólogo e flags narrativas integradas ao Save/Load.
 - `environment.py` e `ambient.py`: texturas, camadas, sombras e efeitos ambientais.
 - `save_manager.py`: validação, gravação atômica e restauração do save.
 - `docs/`: design, estrutura narrativa e documentação técnica.
