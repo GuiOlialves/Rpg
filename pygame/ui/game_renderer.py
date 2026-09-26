@@ -33,14 +33,14 @@ class GameRenderer:
                 draw_world(self.home_canvas, region, self.home_font, close_camera,
                            player, enemies, drops, debug, show_controls,
                            interaction_context=quest_manager, scene_actors=scene_actors,
-                           show_banner=False)
+                           show_banner=False, story_context=story)
                 pygame.transform.scale(self.home_canvas, VIEW, canvas)
                 if show_controls:
                     draw_region_banner(canvas, region, font)
             else:
                 draw_world(canvas, region, font, camera, player, enemies, drops, debug,
                            show_controls=show_controls, interaction_context=quest_manager,
-                           scene_actors=scene_actors)
+                           scene_actors=scene_actors, story_context=story)
 
         if narrative is not None and narrative.active:
             draw_narrative(

@@ -4,6 +4,7 @@ import pygame
 from core.assets import load
 from core.camera import camera_for
 from core.config import FPS, VIEW, WINDOW
+from core.debug_checkpoints import DebugCheckpointMenu, create_checkpoint
 from core.input_handler import InputHandler
 from entities.enemy import Enemy
 from entities.npc import nearest
@@ -28,6 +29,7 @@ from story.story_manager import StoryManager
 from ui import defeat_screen as game_over
 from ui.character_menu import attribute_key_at
 from ui.damage_number import DamageNumber
+from ui.debug_overlay import draw_debug_overlay
 from ui.game_renderer import GameRenderer
 from ui.inventory_menu import handle_inventory_click
 from world.respawn import restore_player_after_death
@@ -47,7 +49,7 @@ class Game:
         spawn_enemies = self.world.spawn_enemies
         reset_forest_boss_encounter = self.world.reset_forest_boss_encounter
         restore_player_after_death = self.restore_player_after_death
-        pygame.init(); pygame.display.set_caption("O Vale RPG | v0.13")
+        pygame.init(); pygame.display.set_caption("O Vale RPG | v0.23")
         screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
         player = Player(load("assets/player/f_player_sheet.png"), load("assets/player/f_player_attack_sheet.png"))
         story = StoryManager({
@@ -89,6 +91,8 @@ class Game:
         hitstop_frames = 0
         game_over_screen = None
         input_handler = InputHandler()
+        checkpoint_menu = DebugCheckpointMenu()
+        debug_session_active = False
         autosave_allowed = True
         intro_autosave_allowed = not save_manager.SAVE_PATH.exists()
         if save_manager.SAVE_PATH.exists():
@@ -122,6 +126,10 @@ class Game:
             nonlocal blue_march_scene
             nonlocal forest_ambush_scene, insignia_memory_scene
             nonlocal red_officer_scene
+            if debug_session_active:
+                quest_manager.notice = "Load desativado durante checkpoints de debug."
+                quest_manager.notice_timer = 180
+                return False
             try:
                 loaded = save_manager.load_game(
                     save_manager.SAVE_PATH,
@@ -169,6 +177,39 @@ class Game:
             quest_manager.notice = "Jogo carregado."
             quest_manager.notice_timer = 180
             return True
+
+        def activate_debug_checkpoint(checkpoint_id):
+            nonlocal player, inventory, quest_manager, story, current_region, region, enemies
+            nonlocal narrative, opened_desert_chests, drops, damage_numbers
+            nonlocal dialogue, ui_mode, inventory_ui, hitstop_frames, game_over_screen
+            nonlocal area_transition, transition_fade, arrival_scene, alden_scene
+            nonlocal house_memory_scene, blue_march_scene, forest_ambush_scene
+            nonlocal insignia_memory_scene, red_officer_scene, autosave_allowed
+            nonlocal debug_session_active
+            preset = create_checkpoint(
+                checkpoint_id, load=load, build_region=build_region,
+                spawn_enemies=spawn_enemies, restore_resident=restore_resident,
+                opening_sequence=opening_sequence)
+            player, inventory, quest_manager = preset.player, preset.inventory, preset.quests
+            story = preset.story
+            current_region, region, enemies = preset.region_id, preset.region, preset.enemies
+            narrative = preset.narrative
+            opened_desert_chests = preset.opened_chests
+            drops, damage_numbers = [], []
+            dialogue = DialogueBox()
+            ui_mode = None
+            inventory_ui = {"tab": "TODOS", "selected": None, "consumable_cooldown": 0}
+            hitstop_frames = 0
+            game_over_screen = None
+            area_transition = None
+            transition_fade = FadeOverlay()
+            arrival_scene = alden_scene = house_memory_scene = None
+            blue_march_scene = forest_ambush_scene = None
+            insignia_memory_scene = red_officer_scene = None
+            checkpoint_menu.checkpoint_id = checkpoint_id
+            checkpoint_menu.close()
+            debug_session_active = True
+            autosave_allowed = False
 
         def continue_after_death():
             nonlocal region, enemies, damage_numbers, hitstop_frames, ui_mode
@@ -218,7 +259,7 @@ class Game:
         while running:
             delta_ms = clock.tick(FPS)
             autosave_pending = False
-            if narrative is not None and narrative.active:
+            if narrative is not None and narrative.active and not checkpoint_menu.active:
                 if narrative.update(delta_ms):
                     # Never replace an existing adventure just because this
                     # launch began as a fresh game; F5 remains explicit.
@@ -268,12 +309,28 @@ class Game:
             if game_over_screen is not None:
                 game_over_screen.update()
             for event in pygame.event.get():
+                if checkpoint_menu.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    else:
+                        action = checkpoint_menu.handle_event(event)
+                        if action is not None:
+                            action_name, checkpoint_id = action
+                            if action_name == "close":
+                                ui_mode = None
+                            else:
+                                activate_debug_checkpoint(checkpoint_id)
+                    continue
                 if narrative is not None and narrative.active:
                     if event.type == pygame.QUIT:
                         running = False
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
                         if narrative.update(sum(beat.duration_ms for beat in narrative.beats)):
                             autosave_pending |= complete_opening()
+                    elif (event.type == pygame.KEYDOWN and event.key == pygame.K_F2
+                          and checkpoint_menu.enabled):
+                        checkpoint_menu.open()
+                        ui_mode = "debug_checkpoints"
                     continue
                 if area_transition is not None:
                     if event.type == pygame.QUIT:
@@ -372,7 +429,9 @@ class Game:
                     elif choice == "quit":
                         running = False
                 elif command.name == "save":
-                    if player.hp <= 0:
+                    if debug_session_active:
+                        quest_manager.notice = "Save desativado durante checkpoints de debug."
+                    elif player.hp <= 0:
                         quest_manager.notice = "Não é possível salvar após a derrota."
                     else:
                         try:
@@ -456,6 +515,11 @@ class Game:
                     ui_mode = None if ui_mode == "inventory" else "inventory"
                 elif command.name == "toggle_debug":
                     debug = not debug
+                elif command.name == "debug_checkpoints":
+                    if (checkpoint_menu.enabled and ui_mode is None and not dialogue.active
+                            and area_transition is None and game_over_screen is None):
+                        checkpoint_menu.open()
+                        ui_mode = "debug_checkpoints"
                 elif command.name == "spend_stat":
                     if command.value:
                         player.spend_stat(command.value)
@@ -532,12 +596,13 @@ class Game:
                         if abs(player.x - trigger_x) ** 2 + abs(player.y - trigger_y) ** 2 <= 158 ** 2:
                             if group_index == 0:
                                 forest_ambush_scene = RedAmbushScene(
-                                    player, dialogue, load, group)
+                                    player, dialogue, load, group,
+                                    actors=spawn_forest_red_group(0))
                             else:
                                 story.set_forest_battle_progress(progress + 1)
                                 enemies = spawn_forest_red_group(group_index)
                                 autosave_pending = True
-                if (current_region == "forest" and story.get("red_insignia_found")
+                if (current_region == "forest" and story.wounded_commander_ready
                         and not story.get("red_officer_met") and not enemies
                         and player.hp > 0 and game_over_screen is None):
                     trigger_x, trigger_y = region["red_officer_trigger"]
@@ -574,7 +639,8 @@ class Game:
                         player.invulnerability_timer = 30
                         autosave_pending = True
                         break
-            if autosave_pending and autosave_allowed and player.hp > 0 and game_over_screen is None:
+            if (autosave_pending and autosave_allowed and not debug_session_active
+                    and player.hp > 0 and game_over_screen is None):
                 try:
                     save_manager.save_game(player, inventory, quest_manager, current_region,
                                            opened_desert_chests, drops, story=story)
@@ -595,5 +661,25 @@ class Game:
                 forest_ambush_scene=forest_ambush_scene,
                 insignia_memory_scene=insignia_memory_scene,
                 red_officer_scene=red_officer_scene, story=story)
+            if debug:
+                draw_debug_overlay(
+                    canvas, current_region=current_region, region=region,
+                    player=player, enemies=enemies, story=story, quests=quest_manager,
+                    narrative=narrative,
+                    scenes={
+                        "arrival_scene": arrival_scene, "alden_scene": alden_scene,
+                        "house_memory_scene": house_memory_scene,
+                        "blue_march_scene": blue_march_scene,
+                        "forest_ambush_scene": forest_ambush_scene,
+                        "insignia_memory_scene": insignia_memory_scene,
+                        "red_officer_scene": red_officer_scene,
+                    },
+                    dialogue=dialogue, ui_mode=ui_mode,
+                    transition_active=area_transition is not None,
+                    transition_fade=transition_fade,
+                    game_over_screen=game_over_screen,
+                    checkpoint_label=(checkpoint_menu.status_label
+                                      if debug_session_active else ""))
+            checkpoint_menu.draw(canvas)
             pygame.transform.scale(canvas, WINDOW, screen); pygame.display.flip()
         pygame.quit(); return 0

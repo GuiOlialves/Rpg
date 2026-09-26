@@ -24,25 +24,42 @@ COMMANDER_LINES = (
 )
 
 
-def _blue_uniform(sheet, palette):
-    """Recolor uniform pixels on a supplied character sheet, retaining its art."""
-    result = sheet.copy()
-    with pygame.PixelArray(result) as pixels:
-        for source, target in palette.items():
-            pixels.replace(source, target)
-    return result
+BLUE_FRAME = 192
+BLUE_SIZES = (88, 82, 80, 84)
+BLUE_TINTS = ((255, 242, 206), (255, 255, 255),
+              (220, 235, 255), (245, 235, 220))
+
+
+def blue_troop_sprite(load, variant=0, animation="Idle"):
+    """One military atlas, with subtle uniform variations shared by fallen poses."""
+    sheet = load("sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/"
+                 f"Units/Blue Units/Warrior/Warrior_{animation}.png").copy()
+    sheet.fill(BLUE_TINTS[variant], special_flags=pygame.BLEND_RGB_MULT)
+    return sheet
 
 
 def blue_commander_sprite(load):
-    """Return the same blue-uniform civilian sprite used for the 2C commander."""
-    return _blue_uniform(load("assets/npc/civilian_customer.png"), {
-        (175, 63, 39): (35, 83, 151),
-        (160, 49, 38): (22, 57, 111),
-        (194, 78, 41): (45, 104, 191),
-        (132, 38, 38): (16, 42, 91),
-        (209, 94, 37): (67, 128, 206),
-        (225, 116, 33): (94, 151, 224),
-    })
+    return blue_troop_sprite(load, 0)
+
+
+def blue_fallen_sprite(sheet, draw_size=BLUE_SIZES[0], angle=-76):
+    frame = pygame.transform.scale(sheet.subsurface((0, 0, BLUE_FRAME, BLUE_FRAME)),
+                                   (draw_size, draw_size))
+    return pygame.transform.rotate(frame.subsurface(frame.get_bounding_rect()), angle)
+
+
+class BlueTrooper(NPC):
+    """Stable foot pivot and facing across the military idle/run animations."""
+    def draw(self, canvas, camera):
+        sheet = self.run_sprite if self.running else self.sprite
+        index = (self.anim_tick // 8) % (sheet.get_width() // BLUE_FRAME) if self.running else 0
+        frame = sheet.subsurface((index * BLUE_FRAME, 0, BLUE_FRAME, BLUE_FRAME))
+        if self.facing == 1:
+            frame = pygame.transform.flip(frame, True, False)
+        frame = pygame.transform.scale(frame, (self.draw_size, self.draw_size))
+        foot = self.sprite.subsurface((0, 0, BLUE_FRAME, BLUE_FRAME)).get_bounding_rect().bottom
+        canvas.blit(frame, (round(self.x - self.draw_size / 2 - camera[0]),
+                            round(self.y - foot * self.draw_size / BLUE_FRAME - camera[1])))
 
 
 class BlueMarchScene:
@@ -66,24 +83,12 @@ class BlueMarchScene:
 
     @staticmethod
     def _make_column(load):
-        seller = _blue_uniform(load("assets/npc/civilian_seller.png"), {
-            (69, 49, 98): (30, 62, 130),
-            (101, 59, 130): (48, 91, 176),
-            (90, 55, 118): (36, 76, 154),
-            (146, 70, 167): (72, 119, 211),
-            (127, 68, 155): (59, 102, 191),
-            (55, 45, 81): (23, 48, 105),
-            (84, 25, 31): (22, 49, 105),
-            (96, 26, 29): (29, 63, 132),
-            (114, 30, 28): (35, 76, 155),
-        })
-        customer = blue_commander_sprite(load)
-        commander = NPC("blue_march_commander", "Comandante Azul", (0, 0), {},
-                        customer, frame_size=32, draw_size=64)
-        troops = [NPC(f"blue_march_soldier_{index}", "Soldado Azul", (0, 0), {},
-                      seller, frame_size=32, draw_size=64)
-                  for index in range(1, 4)]
-        return [commander, *troops]
+        return [BlueTrooper(
+            "blue_march_commander" if index == 0 else f"blue_march_soldier_{index}",
+            "Comandante Azul" if index == 0 else "Soldado Azul", (0, 0), {},
+            blue_troop_sprite(load, index), run_sprite=blue_troop_sprite(load, index, "Run"),
+            frame_size=BLUE_FRAME, draw_size=size)
+            for index, size in enumerate(BLUE_SIZES)]
 
     @property
     def world_actors(self):

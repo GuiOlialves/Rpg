@@ -4,6 +4,7 @@ import pygame
 from entities.npc import NPC
 from story.arrival_scene import ScriptedDialogue
 from story.sequence import Beat, NarrativeSequence
+from story.blue_march import blue_fallen_sprite
 
 
 REVELATION_LINES = (
@@ -37,16 +38,14 @@ class _WoundedCommander:
     config = {"hitbox_radius": 22}
 
     def __init__(self, sprite, position):
-        self.frame = sprite.subsurface((0, 0, 32, 32)).copy()
+        self.sheet = sprite
         self.x, self.center_y = position
-        self.y = self.center_y + 26
-        self.image = pygame.transform.rotate(
-            pygame.transform.scale(self.frame, (72, 72)), -76)
+        self.y = self.center_y + 10
+        self.image = blue_fallen_sprite(self.sheet)
 
     def look_back(self):
         # A slight lift/turn is enough to make his reaction readable while prone.
-        self.image = pygame.transform.rotate(
-            pygame.transform.scale(self.frame, (72, 72)), -48)
+        self.image = blue_fallen_sprite(self.sheet, angle=-48)
 
     def draw(self, canvas, camera):
         canvas.blit(self.image, (round(self.x - self.image.get_width() / 2 - camera[0]),

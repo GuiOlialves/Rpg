@@ -44,6 +44,12 @@ class StoryManager:
     def home_phase(self):
         return "home_investigation" if self.get("house_investigation_unlocked") else "home_initial"
 
+    @property
+    def wounded_commander_ready(self):
+        return (self.get("blue_army_departed")
+                and self.get("forest_battle_progress", 0) == 10
+                and self.get("red_insignia_found"))
+
     def apply_to_region(self, region):
         if region.get("ambient_kind") == "home":
             region["story_phase"] = self.home_phase
@@ -64,12 +70,22 @@ class StoryManager:
         elif region.get("ambient_kind") == "forest":
             post_march = self.get("blue_army_departed")
             region["story_phase"] = "forest_post_march" if post_march else "forest_initial"
+            commander_prop = region.get("wounded_commander_object")
+            if not self.wounded_commander_ready and commander_prop in region.get("objects", []):
+                region["objects"].remove(commander_prop)
             if not post_march:
                 return
             region["enemy_spawns"] = []
             if not region.get("forest_post_march_applied"):
                 region["objects"].extend(region.get("forest_battlefield_objects", ()))
                 region["forest_post_march_applied"] = True
+            if "red_contacts" not in region and "prepare_red_contacts" in region:
+                region["red_contacts"] = region["prepare_red_contacts"]()
+                region.setdefault("scenery", []).extend(region["red_contacts"])
+            progress = self.get("forest_battle_progress", 0)
+            for contact in region.get("red_contacts", ()):
+                contact.visible = (not self.get("red_insignia_found")
+                                   and contact.group_index * 2 >= progress)
             interactables = region.setdefault("interactables", [])
             body = next((obj for obj in interactables if obj.uid == "battlefield_body"), None)
             if self.get("forest_massacre_discovered"):
@@ -87,7 +103,7 @@ class StoryManager:
                 insignia_prop = region.get("forest_battlefield_interactables", {}).get("insignia")
                 if insignia_prop is not None:
                     interactables.append(insignia_prop)
-            if self.get("red_insignia_found"):
+            if self.wounded_commander_ready:
                 commander_prop = region.get("wounded_commander_object")
                 if commander_prop is not None and commander_prop not in region["objects"]:
                     region["objects"].append(commander_prop)

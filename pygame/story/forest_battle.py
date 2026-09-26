@@ -2,7 +2,6 @@
 import pygame
 
 from entities.enemy import Enemy
-from entities.npc import NPC
 from story.arrival_scene import ScriptedDialogue, Silhouette
 from story.sequence import Beat, NarrativeSequence
 
@@ -30,7 +29,43 @@ PRESENT_LINES = (
 )
 
 
+class RedContact:
+    """A stationed soldier rendered as scenery until its scripted contact starts."""
+    def __init__(self, actor, group_index):
+        self.actor = actor
+        self.group_index = group_index
+        self.visible = True
+
+    @property
+    def depth(self):
+        return self.actor.y
+
+    def draw(self, canvas, camera, player=None):
+        if self.visible:
+            self.actor.draw(canvas, camera)
+
+
+def prepare_red_contacts(groups, load):
+    sheets = {}
+
+    def cached_load(path):
+        if path not in sheets:
+            sheets[path] = load(path)
+        return sheets[path]
+
+    return [RedContact(Enemy("red_soldier", position, cached_load,
+                             seed=720 + index * 3 + offset), index)
+            for index, positions in enumerate(groups)
+            for offset, position in enumerate(positions)]
+
+
 def spawn_red_group(index, region, load):
+    contacts = [contact for contact in region.get("red_contacts", ())
+                if contact.group_index == index]
+    if contacts:
+        for contact in contacts:
+            contact.visible = False
+        return [contact.actor for contact in contacts]
     positions = region["red_encounter_groups"][index]
     return [Enemy("red_soldier", position, load, seed=720 + index * 3 + offset)
             for offset, position in enumerate(positions)]
@@ -39,19 +74,16 @@ def spawn_red_group(index, region, load):
 class RedAmbushScene:
     """The first two soldiers identify the protagonist before combat begins."""
 
-    def __init__(self, player, dialogue, load, positions):
+    def __init__(self, player, dialogue, load, positions, actors=None):
         self.player = player
         self.dialogue = dialogue
         self.active = True
         self.dialogue_actor = ScriptedDialogue(AMBUSH_LINES)
-        idle = load("sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/Warrior_Idle.png")
-        self.actors = [
-            NPC(f"red_ambush_{index}", f"Soldado Vermelho {index + 1}", position,
-                {}, idle, frame_size=192, draw_size=86)
-            for index, position in enumerate(positions)
-        ]
-        for actor in self.actors:
-            actor.face_player(player)
+        self.actors = actors if actors is not None else [
+            Enemy("red_soldier", position, load, seed=720 + index)
+            for index, position in enumerate(positions)]
+        # Keep the same scale, feet and facing as the soldiers already seen
+        # during exploration and as the Enemy instances used in combat.
         self.player.walk_frame = 0
         self.dialogue.open(self.dialogue_actor)
 

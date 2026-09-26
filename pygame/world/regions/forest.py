@@ -4,7 +4,8 @@ import random
 import pygame
 import environment as env
 from entities.interactable import Interactable
-from story.blue_march import blue_commander_sprite
+from story.blue_march import blue_commander_sprite, blue_troop_sprite, blue_fallen_sprite, BLUE_SIZES
+from story.forest_battle import prepare_red_contacts
 
 WORLD=(2048,1152)
 TREES=[(175,120),(320,245),(525,72),(820,155),(1060,105),(1120,270),(450,410),
@@ -95,11 +96,9 @@ def build(load):
     blue_frame = blue_idle.subsurface((0, 0, 192, 192)).copy()
     red_frame = red_idle.subsurface((0, 0, 192, 192)).copy()
     commander_sheet = blue_commander_sprite(load)
-    commander_frame = commander_sheet.subsurface((0, 0, 32, 32)).copy()
-    commander_fallen = pygame.transform.rotate(
-        pygame.transform.scale(commander_frame, (72, 72)), -76)
-    fallen_blue = pygame.transform.rotate(
-        pygame.transform.scale_by(blue_frame, 0.48), 72)
+    commander_fallen = blue_fallen_sprite(commander_sheet)
+    fallen_blue = [blue_fallen_sprite(blue_troop_sprite(load, index), BLUE_SIZES[index], angle)
+                   for index, angle in ((1, 72), (2, -68), (3, 100))]
     blue_sword = pygame.transform.rotate(
         pygame.transform.scale_by(blue_frame.subsurface((116, 66, 36, 54)), 0.9), 48)
     blue_shield = pygame.transform.rotate(
@@ -115,11 +114,11 @@ def build(load):
         'red_insignia', 'Protagonista', (1280, 492), red_insignia, (),
         prompt='[E] Pegar insígnia', interaction_radius=70)
     battlefield_objects = [
-        (fallen_blue, (246, 541)),
+        (fallen_blue[0], (290, 550)),
         (blue_sword, (370, 532)),
         (blue_shield, (453, 554)),
-        (fallen_blue, (634, 463)),
-        (fallen_blue, (1090, 412)),
+        (fallen_blue[1], (650, 477)),
+        (fallen_blue[2], (1100, 425)),
     ]
     red_encounter_groups = (
         ((550, 536), (620, 566)),
@@ -151,6 +150,7 @@ def build(load):
             'forest_battlefield_interactables': {
                 'body': battlefield_body, 'insignia': insignia_prop},
             'red_encounter_groups': red_encounter_groups,
+            'prepare_red_contacts': lambda: prepare_red_contacts(red_encounter_groups, load),
             'wounded_commander_object': (
                 commander_fallen,
                 (1460 - commander_fallen.get_width() // 2,

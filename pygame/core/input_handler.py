@@ -44,6 +44,8 @@ class InputHandler:
         key = event.key
         if key == pygame.K_F5:
             return InputCommand("save")
+        if key == pygame.K_F2:
+            return InputCommand("debug_checkpoints")
         if key == pygame.K_F9:
             return InputCommand("load")
         if key == pygame.K_ESCAPE:
