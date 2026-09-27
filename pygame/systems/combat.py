@@ -24,6 +24,7 @@ class CombatFrame:
     autosave_pending: bool = False
     player_defeated: bool = False
     feedback: list = field(default_factory=list)
+    defeated_soldiers: list = field(default_factory=list)
 
 
 class CombatSystem:
@@ -34,6 +35,7 @@ class CombatSystem:
                quests, hitstop_frames):
         feedback = []
         autosave_pending = False
+        defeated_soldiers = []
         if region_id == "forest":
             region["north_locked"] = not quests.forest_boss_defeated
 
@@ -78,6 +80,8 @@ class CombatSystem:
             if new_drop is not None:
                 drops.append(new_drop)
             if enemy.state == "DEAD" and enemy.dead_timer == 35:
+                if enemy.kind == "red_soldier" and hasattr(enemy, "scripted_id"):
+                    defeated_soldiers.append(enemy.scripted_id)
                 old_level = player.level
                 reward_xp = enemy.config.get("xp_reward", 0)
                 player.gain_xp(reward_xp)
@@ -115,4 +119,4 @@ class CombatSystem:
                 add_inventory_item(inventory, drop.item)
                 drops.remove(drop)
         return CombatFrame(enemies, drops, hitstop_frames, autosave_pending,
-                           player.hp <= 0, feedback)
+                           player.hp <= 0, feedback, defeated_soldiers)

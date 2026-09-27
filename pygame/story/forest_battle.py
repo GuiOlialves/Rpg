@@ -53,22 +53,31 @@ def prepare_red_contacts(groups, load):
             sheets[path] = load(path)
         return sheets[path]
 
-    return [RedContact(Enemy("red_soldier", position, cached_load,
-                             seed=720 + index * 3 + offset), index)
-            for index, positions in enumerate(groups)
-            for offset, position in enumerate(positions)]
+    contacts = []
+    for index, positions in enumerate(groups):
+        for offset, position in enumerate(positions):
+            actor = Enemy("red_soldier", position, cached_load, seed=720 + index * 3 + offset)
+            actor.scripted_id = index * 2 + offset
+            contacts.append(RedContact(actor, index))
+    return contacts
 
 
-def spawn_red_group(index, region, load):
+def spawn_red_group(index, region, load, story=None):
     contacts = [contact for contact in region.get("red_contacts", ())
                 if contact.group_index == index]
     if contacts:
         for contact in contacts:
             contact.visible = False
-        return [contact.actor for contact in contacts]
+        return [contact.actor for contact in contacts
+                if story is None or not story.soldier_defeated(contact.actor.scripted_id)]
     positions = region["red_encounter_groups"][index]
-    return [Enemy("red_soldier", position, load, seed=720 + index * 3 + offset)
-            for offset, position in enumerate(positions)]
+    actors = []
+    for offset, position in enumerate(positions):
+        actor = Enemy("red_soldier", position, load, seed=720 + index * 3 + offset)
+        actor.scripted_id = index * 2 + offset
+        if story is None or not story.soldier_defeated(actor.scripted_id):
+            actors.append(actor)
+    return actors
 
 
 class RedAmbushScene:
@@ -85,6 +94,8 @@ class RedAmbushScene:
         # Keep the same scale, feet and facing as the soldiers already seen
         # during exploration and as the Enemy instances used in combat.
         self.player.walk_frame = 0
+        self.player.invulnerability_timer = 0
+        self.player.attack_timer = self.player.dash_timer = self.player.dash_iframes = 0
         self.dialogue.open(self.dialogue_actor)
 
     @property
@@ -142,6 +153,8 @@ class InsigniaMemoryScene:
 
     def __init__(self, player, image, dialogue, load):
         self.player = player
+        self.player.invulnerability_timer = 0
+        self.player.attack_timer = self.player.dash_timer = self.player.dash_iframes = 0
         self.dialogue = dialogue
         self.image = image
         self.steps = self.STEPS

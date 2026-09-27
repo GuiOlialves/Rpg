@@ -150,6 +150,7 @@ class HouseMemoryScene:
         if completed_investigation:
             self.player.walk_frame = 0
             self.player.invulnerability_timer = 0
+            story.set("pendant_found")
             story.set("house_searched")
             story.apply_to_region(region)
         self.dialogue.npc = None

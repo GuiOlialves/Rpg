@@ -78,7 +78,13 @@ class CombatTests(unittest.TestCase):
         self.assertEqual((player.dash_feedback_kind, player.dash_feedback_timer), ("cooldown", 18))
         canvas = pygame.Surface(main.VIEW, pygame.SRCALPHA)
         main.draw_hud(canvas, player, pygame.font.Font(None, 20))
-        self.assertEqual(canvas.get_at((216, main.VIEW[1] - 120 + 61))[:3], (241, 190, 91))
+        # HUD layout/colors changed in 0.21; assert visible feedback rather
+        # than a pixel in the former SP-bar position.
+        player.dash_feedback_timer = 0
+        without_feedback = pygame.Surface(main.VIEW, pygame.SRCALPHA)
+        main.draw_hud(without_feedback, player, pygame.font.Font(None, 20))
+        self.assertNotEqual(pygame.image.tobytes(canvas, "RGBA"),
+                            pygame.image.tobytes(without_feedback, "RGBA"))
         player = self.player()
         self.assertTrue(player.start_dash(defaultdict(bool, {pygame.K_d: True})))
         for _ in range(main.DASH_IFRAMES):

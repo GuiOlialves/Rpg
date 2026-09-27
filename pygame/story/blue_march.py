@@ -79,6 +79,8 @@ class BlueMarchScene:
         self.dialogue_actor = ScriptedDialogue(COMMANDER_LINES)
         self.actors = self._make_column(load)
         self.player.walk_frame = 0
+        self.player.invulnerability_timer = 0
+        self.player.attack_timer = self.player.dash_timer = self.player.dash_iframes = 0
         self.player.facing = 1
         self._place_column()
 

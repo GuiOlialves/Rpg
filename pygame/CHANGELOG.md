@@ -2,6 +2,14 @@
 
 Resumo breve das mudanças por versão. O histórico reflete os marcos do projeto; versões sem tag Git foram registradas como marcos, não como releases formais.
 
+## 0.32
+
+- Auditoria técnica final do prólogo completo, cobrindo fluxo, checkpoints, cutscenes, F4, Save/Load e o boss.
+- Save/Load preserva soldados vermelhos derrotados durante batalhas parciais e remove corretamente o Oficial após a fuga.
+- O cartão final pode ser fechado para continuar e permanece disponível ao carregar um prólogo concluído.
+- F5 é bloqueado durante o boss para preservar HP e fase durante a luta.
+- Regressões de objetivos, memória do pingente, entidades duplicadas e estados do Oficial foram cobertas por testes direcionados.
+
 ## 0.3
 
 - Prólogo 3A: continuação do confronto entre o protagonista, o Oficial Vermelho e o comandante azul, com a revelação do nome de cinco letras ainda encoberto.

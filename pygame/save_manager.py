@@ -190,6 +190,7 @@ def validate(data):
         "blue_army_departed",
         "forest_massacre_discovered", "red_insignia_found",
         "forest_battle_progress", "red_officer_met", "red_officer_boss_ready", "red_officer_defeated",
+        "forest_battle_casualties",
         "red_officer_memory_seen", "red_officer_escaped", "prologue_completed",
     }
     if not set(story).issubset(known_flags):
@@ -198,10 +199,14 @@ def validate(data):
     for name, value in story.items():
         if name == "forest_battle_progress":
             _integer(value, "story.forest_battle_progress", 0, 10)
+        elif name == "forest_battle_casualties":
+            _integer(value, "story.forest_battle_casualties", 0, 1023)
         else:
             _boolean(value, f"story.{name}")
     talked = story.get("alden_post_slimes_talk", False)
     unlocked = story.get("house_investigation_unlocked", False)
+    if started and unlocked:
+        raise SaveError("Save inválido: evento legado do Guardião durante o prólogo atual.")
     if talked != unlocked or (talked and quest_data["forest_trouble"]["state"] != REWARDED):
         raise SaveError("Save inválido: conversa com Alden e investigação inconsistentes.")
     pendant_found = story.get("pendant_found", False)
@@ -212,6 +217,10 @@ def validate(data):
     if story.get("blue_army_departed", False) and not house_searched:
         raise SaveError("Save inválido: marcha azul antes da investigação da casa.")
     battle_progress = story.get("forest_battle_progress", 0)
+    casualties = story.get("forest_battle_casualties", 0)
+    allowed_soldiers = min(10, (battle_progress + 1) // 2 * 2)
+    if casualties >> allowed_soldiers:
+        raise SaveError("Save inválido: soldados derrotados antes do encontro.")
     if ((story.get("forest_massacre_discovered", False) or battle_progress > 0
          or story.get("red_insignia_found", False))
             and not story.get("blue_army_departed", False)):
@@ -373,6 +382,11 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
     if (region_id == "forest" and story.get("blue_army_departed")
             and not quests.forest_event_started):
         enemies = []
+        progress = story.get("forest_battle_progress", 0)
+        if progress % 2 and not story.get("red_insignia_found"):
+            from story.forest_battle import spawn_red_group
+            from core.assets import load
+            enemies = spawn_red_group(progress // 2, region, load, story)
     player.x, player.y = _safe_position(tuple(character["position"]), region_id, region, enemies)
     drops = [Drop(consumable(entry["id"], entry["amount"]), *entry["position"], entry["lifetime"])
              for entry in data["drops"]]

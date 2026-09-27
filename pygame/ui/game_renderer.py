@@ -23,6 +23,8 @@ def draw_prologue_card(canvas):
         canvas.blit(image, image.get_rect(center=(canvas.get_width() // 2,
                                                    y + image.get_height() // 2)))
         y += image.get_height() + 32
+    prompt = pygame.font.Font(None, 22).render("[E / Enter] Continuar", True, (180, 180, 180))
+    canvas.blit(prompt, prompt.get_rect(center=(canvas.get_width() // 2, canvas.get_height() - 48)))
 
 
 class GameRenderer:
@@ -33,7 +35,7 @@ class GameRenderer:
              alden_scene=None, house_memory_scene=None, blue_march_scene=None,
              forest_ambush_scene=None, insignia_memory_scene=None,
              red_officer_scene=None, prologue_3c_scene=None,
-             story=None):
+             story=None, prologue_end_card=False):
         def render_world(show_controls=True, scene_actors=(), include_player=True):
             world_player = player if include_player else None
             if region.get("ambient_kind") == "home":
@@ -58,7 +60,7 @@ class GameRenderer:
                            show_controls=show_controls, interaction_context=quest_manager,
                            scene_actors=scene_actors, story_context=story)
 
-        if story is not None and story.get("prologue_completed"):
+        if prologue_end_card:
             draw_prologue_card(canvas)
             return
         if narrative is not None and narrative.active:

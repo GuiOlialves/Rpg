@@ -64,7 +64,8 @@ class WorldManager:
         """Resolve an exit and build its destination without owning game state."""
         if not self.can_transition(source, destination, quests):
             return RegionTransition(source, {}, [], (0, 0),
-                                    "Derrote o Guardião da Clareira para seguir ao norte.", True)
+                                    ("Derrote o Guardião da Clareira para seguir ao norte."
+                                     if quests.forest_event_started else "O caminho ao norte está bloqueado."), True)
         if destination == "ruins_future":
             region = source_region if source_region is not None else self.build_region(source)
             if not region.get("future_exit_notified"):

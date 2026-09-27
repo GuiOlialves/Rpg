@@ -51,7 +51,7 @@ class Game:
         spawn_enemies = self.world.spawn_enemies
         reset_forest_boss_encounter = self.world.reset_forest_boss_encounter
         restore_player_after_death = self.restore_player_after_death
-        pygame.init(); pygame.display.set_caption("O Vale RPG | v0.3")
+        pygame.init(); pygame.display.set_caption("O Vale RPG | v0.32")
         screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
         player = Player(load("assets/player/f_player_sheet.png"),
                         load("assets/player/f_player_attack_sheet.png"))
@@ -79,6 +79,7 @@ class Game:
         insignia_memory_scene = None
         red_officer_scene = None
         prologue_3c_scene = None
+        prologue_end_card = False
         current_region = "home"
         region = build_region(current_region)
         story.apply_to_region(region)
@@ -118,12 +119,12 @@ class Game:
                     return []
                 progress = story.get("forest_battle_progress", 0)
                 if progress % 2:
-                    return spawn_red_group(progress // 2, story_region, load)
+                    return spawn_red_group(progress // 2, story_region, load, story)
                 return []
             return region_enemies
 
         def spawn_forest_red_group(index):
-            return spawn_red_group(index, region, load)
+            return spawn_red_group(index, region, load, story)
 
         def load_last_save():
             nonlocal player, inventory, quest_manager, current_region, region, enemies
@@ -132,7 +133,8 @@ class Game:
             nonlocal story, narrative, arrival_scene, alden_scene, house_memory_scene
             nonlocal blue_march_scene
             nonlocal forest_ambush_scene, insignia_memory_scene
-            nonlocal red_officer_scene
+            nonlocal red_officer_scene, prologue_3c_scene, prologue_end_card
+            nonlocal area_transition, transition_fade
             if debug_session_active:
                 quest_manager.notice = "Load desativado durante checkpoints de debug."
                 quest_manager.notice_timer = 180
@@ -156,6 +158,7 @@ class Game:
             player, inventory, quest_manager = loaded.player, loaded.inventory, loaded.quests
             current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
             story = loaded.story
+            prologue_end_card = story.get("prologue_completed")
             arrival_scene = None
             alden_scene = None
             house_memory_scene = None
@@ -164,6 +167,9 @@ class Game:
             insignia_memory_scene = None
             red_officer_scene = None
             prologue_3c_scene = None
+            prologue_end_card = False
+            area_transition = None
+            transition_fade = FadeOverlay()
             if current_region == "village" and story.get("slime_quest_started"):
                 restore_resident(region, load("assets/npc/civilian_customer.png"))
             if not story.get("woke_up"):
@@ -197,6 +203,7 @@ class Game:
             nonlocal house_memory_scene, blue_march_scene, forest_ambush_scene
             nonlocal insignia_memory_scene, red_officer_scene, prologue_3c_scene, autosave_allowed
             nonlocal debug_session_active
+            nonlocal prologue_end_card
             preset = create_checkpoint(
                 checkpoint_id, load=load, build_region=build_region,
                 spawn_enemies=spawn_enemies, restore_resident=restore_resident,
@@ -217,6 +224,7 @@ class Game:
             arrival_scene = alden_scene = house_memory_scene = None
             blue_march_scene = forest_ambush_scene = None
             insignia_memory_scene = red_officer_scene = prologue_3c_scene = None
+            prologue_end_card = False
             checkpoint_menu.checkpoint_id = checkpoint_id
             checkpoint_menu.close()
             debug_session_active = True
@@ -447,10 +455,18 @@ class Game:
                         if prologue_3c_scene.finish():
                             autosave_pending = True
                             prologue_3c_scene = None
+                            prologue_end_card = True
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                         if prologue_3c_scene.advance():
                             autosave_pending = True
                             prologue_3c_scene = None
+                            prologue_end_card = True
+                    continue
+                if prologue_end_card:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key in (pygame.K_e, pygame.K_RETURN, pygame.K_ESCAPE):
+                        prologue_end_card = False
                     continue
                 command = input_handler.route(
                     event, ui_mode=ui_mode, dialogue=dialogue, player=player,
@@ -473,6 +489,8 @@ class Game:
                 elif command.name == "save":
                     if debug_session_active:
                         quest_manager.notice = "Save desativado durante checkpoints de debug."
+                    elif region.get("boss_battle_active"):
+                        quest_manager.notice = "Não é possível salvar durante o confronto."
                     elif player.hp <= 0:
                         quest_manager.notice = "Não é possível salvar após a derrota."
                     else:
@@ -536,7 +554,7 @@ class Game:
                                     target, player, dialogue, quest_manager, story)
                             elif (current_region == "home" and target.uid == "broken_pendant"
                                   and story.get("house_investigation_unlocked")
-                                  and not story.get("pendant_found")):
+                                  and not story.get("house_searched")):
                                 story.set("pendant_found")
                                 region["interactables"] = [
                                     obj for obj in region["interactables"]
@@ -612,12 +630,13 @@ class Game:
                 if prologue_3c_scene.update(delta_ms):
                     autosave_pending = True
                     prologue_3c_scene = None
+                    prologue_end_card = True
                 elif prologue_3c_scene.autosave_requested:
                     autosave_pending = True
                     prologue_3c_scene.autosave_requested = False
             elif game_over_screen is not None:
                 pass
-            elif story.get("prologue_completed"):
+            elif prologue_end_card:
                 pass
             elif hitstop_frames > 0:
                 hitstop_frames -= 1
@@ -629,6 +648,9 @@ class Game:
                 enemies, drops = combat_frame.enemies, combat_frame.drops
                 hitstop_frames = combat_frame.hitstop_frames
                 autosave_pending |= combat_frame.autosave_pending
+                for soldier_id in combat_frame.defeated_soldiers:
+                    story.record_soldier_defeat(soldier_id)
+                    autosave_pending = True
                 for feedback in combat_frame.feedback:
                     damage_numbers.append(DamageNumber(
                         feedback.text, *feedback.position, feedback.color, feedback.critical))
@@ -730,7 +752,8 @@ class Game:
                 forest_ambush_scene=forest_ambush_scene,
                 insignia_memory_scene=insignia_memory_scene,
                 red_officer_scene=red_officer_scene,
-                prologue_3c_scene=prologue_3c_scene, story=story)
+                prologue_3c_scene=prologue_3c_scene, story=story,
+                prologue_end_card=prologue_end_card)
             if debug:
                 draw_debug_overlay(
                     canvas, current_region=current_region, region=region,

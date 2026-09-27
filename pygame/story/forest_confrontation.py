@@ -130,7 +130,7 @@ class _RedOfficer(NPC):
         source_foot = frame.get_bounding_rect().bottom
         scaled_height = max(1, round(self.draw_size * self.frame_height / self.frame_size))
         frame = pygame.transform.scale(frame, (self.draw_size, scaled_height))
-        if getattr(self, "state", None) == "DEFEATED":
+        if getattr(self, "state", None) == "DEFEATED" and not getattr(self, "standing_up", False):
             frame = pygame.transform.rotate(frame.subsurface(frame.get_bounding_rect()), -55)
             canvas.blit(frame, (round(self.x - frame.get_width() / 2 - camera[0]),
                                 round(self.y - frame.get_height() / 2 - camera[1])))
@@ -186,6 +186,8 @@ class RedOfficerScene:
         self.continuation_index = -1
         self.player.facing = 2
         self.player.walk_frame = 0
+        self.player.invulnerability_timer = 0
+        self.player.attack_timer = self.player.dash_timer = self.player.dash_iframes = 0
         if story.get("red_officer_met"):
             self._next_confrontation()
         else:

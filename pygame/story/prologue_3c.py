@@ -66,7 +66,7 @@ class _PlacedObject:
 
 
 class Prologue3CScene:
-    """Atomic F4 skip, then a persistent end card rather than post-story play."""
+    """Atomic F4 skip and resumable narrative milestones before the end card."""
     def __init__(self, player, story, region, dialogue, load):
         self.player, self.story, self.region = player, story, region
         self.dialogue, self.load = dialogue, load
@@ -98,8 +98,14 @@ class Prologue3CScene:
         self.officer=(None if story.get("red_officer_escaped")
                       else factory() if factory else old)
         if self.officer is not None:
+            if old is not None:
+                self.officer.x, self.officer.y = old.x, old.y
+            self.officer.state = "DEFEATED"
+            self.officer.hp = 1
+            self.officer.hostile = self.officer.boss_battle_active = False
             self.officer.running=False
             self.officer.facing=2
+        region["boss_battle_active"] = False
         region["red_officer_actor"]=self.officer
         self.object_start=(self.officer.x,self.officer.y-16) if self.officer else (player.x,player.y)
         self.object_target=(player.x+24,player.y+1)
@@ -117,6 +123,7 @@ class Prologue3CScene:
             self.officer.x=player.x+150
             self.officer.y=player.y-4
             self.officer.running=True
+            self.officer.standing_up=True
             self.index=0
             self._dialogue((AFTER_MEMORY[0],),"after_memory")
         else:
@@ -132,8 +139,8 @@ class Prologue3CScene:
         self.phase=phase
         self.sequence_action=action
         self.sequence=NarrativeSequence((Beat(text,duration,background="world"),))
-        if fade: self.sequence.fade.start(fade,duration)
         self.sequence.start()
+        if fade: self.sequence.fade.start(fade,duration)
 
     def _after_line(self):
         i=self.index
@@ -206,12 +213,13 @@ class Prologue3CScene:
             self.object_x=self.object_start[0]+(self.object_target[0]-self.object_start[0])*t
             self.object_y=self.object_start[1]+(self.object_target[1]-self.object_start[1])*t-36*math.sin(t*math.pi)
         if self.officer is not None and self.phase=="memory":
-            self.officer.x+=delta_ms*.045
-            self.officer.y-=delta_ms*.008
+            self.officer.standing_up=True
+            self.officer.x=min(self.player.x+150, self.officer.x+delta_ms*.045)
+            self.officer.y=max(self.player.y-24, self.officer.y-delta_ms*.008)
             self.officer.anim_tick+=max(1,round(delta_ms/(1000/60)))
         if self.phase=="after_memory" and self.officer is not None and self.officer.running:
-            self.officer.x+=delta_ms*.085
-            self.officer.y-=delta_ms*.018
+            self.officer.x=min(self.player.x+220, self.officer.x+delta_ms*.085)
+            self.officer.y=max(self.player.y-48, self.officer.y-delta_ms*.018)
             self.officer.anim_tick+=max(1,round(delta_ms/(1000/60)))
         if self.phase=="flee":
             self.elapsed_ms+=delta_ms
@@ -268,9 +276,10 @@ class Prologue3CScene:
         return False
 
     def _escape(self):
-        if self.story.get("red_officer_escaped"):return
         self.story.set("red_officer_escaped")
         if self.officer in self.region.get("scenery",[]):self.region["scenery"].remove(self.officer)
+        self.region.pop("red_officer_actor", None)
+        self.region["boss_battle_active"] = False
         self.officer=None
 
     def _complete(self):
@@ -282,6 +291,7 @@ class Prologue3CScene:
         self.dialogue.npc=None
         self.player.attack_timer=self.player.dash_timer=self.player.dash_iframes=0
         self.player.invulnerability_timer=0
+        self.player.facing=2
         return True
 
     def finish(self):

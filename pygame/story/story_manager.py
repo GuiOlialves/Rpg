@@ -18,6 +18,9 @@ class StoryManager:
             if name == "forest_battle_progress":
                 if type(value) is not int or not 0 <= value <= 10:
                     raise ValueError("O progresso da batalha da Floresta deve estar entre 0 e 10.")
+            elif name == "forest_battle_casualties":
+                if type(value) is not int or not 0 <= value <= 1023:
+                    raise ValueError("Máscara de soldados derrotados inválida.")
             elif type(value) is not bool:
                 raise ValueError("Cada flag da história deve ter valor booleano.")
 
@@ -35,10 +38,30 @@ class StoryManager:
     def to_dict(self):
         return dict(self.flags)
 
+    def soldier_defeated(self, index):
+        # Old saves only recorded complete pairs; retain that interpretation.
+        completed = self.get("forest_battle_progress", 0) // 2 * 2
+        return bool((self.get("forest_battle_casualties", 0) | ((1 << completed) - 1))
+                    & (1 << index))
+
+    def record_soldier_defeat(self, index):
+        self.set("forest_battle_casualties",
+                 self.get("forest_battle_casualties", 0) | (1 << index))
+
     @property
     def objective_text(self):
-        return ("Investigue a casa." if self.get("house_investigation_unlocked")
-                and not self.get("house_searched") else "")
+        if self.get("prologue_completed") or self.get("red_officer_defeated"):
+            return ""
+        if self.get("red_officer_boss_ready"):
+            return "Enfrente o Oficial Vermelho."
+        if self.get("red_insignia_found"):
+            return "Avance pela Floresta."
+        if self.get("blue_army_departed"):
+            return ("Examine a insígnia vermelha." if self.get("forest_battle_progress", 0) == 10
+                    else "Explore a Floresta.")
+        if self.get("house_searched"):
+            return "Saia da casa."
+        return ("Investigue a casa." if self.get("house_investigation_unlocked") else "")
 
     @property
     def home_phase(self):
@@ -62,7 +85,7 @@ class StoryManager:
                 region["objects"].extend(
                     obj for obj in region.get("investigation_objects", [])
                     if obj not in existing_visuals)
-            if self.get("pendant_found"):
+            if self.get("house_searched"):
                 region["interactables"] = [
                     obj for obj in region.get("interactables", [])
                     if obj.uid != "broken_pendant"]
@@ -85,7 +108,8 @@ class StoryManager:
             progress = self.get("forest_battle_progress", 0)
             for contact in region.get("red_contacts", ()):
                 contact.visible = (not self.get("red_insignia_found")
-                                   and contact.group_index * 2 >= progress)
+                                   and contact.group_index * 2 >= progress
+                                   and not self.soldier_defeated(contact.actor.scripted_id))
             interactables = region.setdefault("interactables", [])
             body = next((obj for obj in interactables if obj.uid == "battlefield_body"), None)
             if self.get("forest_massacre_discovered"):
@@ -109,18 +133,22 @@ class StoryManager:
                 region["objects"].append(commander_prop)
 
             if self.get("red_officer_escaped"):
-                officer = region.get("red_officer_actor")
+                officer = region.pop("red_officer_actor", None)
                 if officer in region.get("scenery", []):
                     region["scenery"].remove(officer)
+                region["boss_battle_active"] = False
             elif self.get("red_officer_met") and "create_waiting_officer" in region:
                 if "red_officer_actor" not in region:
                     region["red_officer_actor"] = region["create_waiting_officer"]()
                 officer = region["red_officer_actor"]
                 officer.guarded = self.get("red_officer_boss_ready")
                 if self.get("red_officer_defeated"):
+                    region["boss_battle_active"] = False
                     officer.state = "DEFEATED"
                     officer.hp = 1
-                    officer.alive = True
+                    # Enemy.alive is a read-only property derived from state.
+                    if not isinstance(getattr(type(officer), "alive", None), property):
+                        officer.alive = True
                     officer.hostile = officer.boss_battle_active = False
                     officer.guarded = False
                 if officer not in region.setdefault("scenery", []):
