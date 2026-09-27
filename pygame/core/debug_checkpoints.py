@@ -71,6 +71,10 @@ def create_checkpoint(checkpoint_id, *, load, build_region, spawn_enemies,
         "forest_massacre_discovered": checkpoint_id == "prologue_2e",
         "red_insignia_found": checkpoint_id == "prologue_2e",
         "red_officer_met": False,
+        "red_officer_memory_seen": False,
+        "red_officer_escaped": False,
+        "prologue_completed": False,
+        "red_officer_defeated": False,
         "forest_battle_progress": 10 if checkpoint_id == "prologue_2e" else 0,
     }
     story = StoryManager(flags)

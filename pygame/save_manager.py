@@ -189,7 +189,8 @@ def validate(data):
         "pendant_found", "house_searched",
         "blue_army_departed",
         "forest_massacre_discovered", "red_insignia_found",
-        "forest_battle_progress", "red_officer_met",
+        "forest_battle_progress", "red_officer_met", "red_officer_boss_ready", "red_officer_defeated",
+        "red_officer_memory_seen", "red_officer_escaped", "prologue_completed",
     }
     if not set(story).issubset(known_flags):
         raise SaveError("Save inválido: flags narrativas desconhecidas.")
@@ -219,6 +220,16 @@ def validate(data):
         raise SaveError("Save inválido: insígnia obtida antes do fim dos confrontos.")
     if story.get("red_officer_met", False) and not story.get("red_insignia_found", False):
         raise SaveError("Save inválido: encontro com o Oficial antes da insígnia.")
+    if story.get("red_officer_boss_ready", False) and not story.get("red_officer_met", False):
+        raise SaveError("Save inválido: confronto preparado antes do encontro com o Oficial.")
+    if story.get("red_officer_defeated", False) and not story.get("red_officer_boss_ready", False):
+        raise SaveError("Save inválido: Oficial derrotado antes do confronto.")
+    if story.get("red_officer_memory_seen", False) and not story.get("red_officer_defeated", False):
+        raise SaveError("Save inválido: memória antes da derrota do Oficial.")
+    if story.get("red_officer_escaped", False) and not story.get("red_officer_memory_seen", False):
+        raise SaveError("Save inválido: Oficial escapou antes de concluir a memória.")
+    if story.get("prologue_completed", False) and not story.get("red_officer_escaped", False):
+        raise SaveError("Save inválido: prólogo concluído antes da fuga do Oficial.")
     data["story"] = story
     return data
 

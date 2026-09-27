@@ -71,7 +71,7 @@ class StoryManager:
             post_march = self.get("blue_army_departed")
             region["story_phase"] = "forest_post_march" if post_march else "forest_initial"
             commander_prop = region.get("wounded_commander_object")
-            if not self.wounded_commander_ready and commander_prop in region.get("objects", []):
+            if not post_march and commander_prop in region.get("objects", []):
                 region["objects"].remove(commander_prop)
             if not post_march:
                 return
@@ -103,10 +103,28 @@ class StoryManager:
                 insignia_prop = region.get("forest_battlefield_interactables", {}).get("insignia")
                 if insignia_prop is not None:
                     interactables.append(insignia_prop)
-            if self.wounded_commander_ready:
-                commander_prop = region.get("wounded_commander_object")
-                if commander_prop is not None and commander_prop not in region["objects"]:
-                    region["objects"].append(commander_prop)
+            # The fallen commander belongs to the battlefield scenery; only
+            # the final scene uses wounded_commander_ready to gate progression.
+            if commander_prop is not None and commander_prop not in region["objects"]:
+                region["objects"].append(commander_prop)
+
+            if self.get("red_officer_escaped"):
+                officer = region.get("red_officer_actor")
+                if officer in region.get("scenery", []):
+                    region["scenery"].remove(officer)
+            elif self.get("red_officer_met") and "create_waiting_officer" in region:
+                if "red_officer_actor" not in region:
+                    region["red_officer_actor"] = region["create_waiting_officer"]()
+                officer = region["red_officer_actor"]
+                officer.guarded = self.get("red_officer_boss_ready")
+                if self.get("red_officer_defeated"):
+                    officer.state = "DEFEATED"
+                    officer.hp = 1
+                    officer.alive = True
+                    officer.hostile = officer.boss_battle_active = False
+                    officer.guarded = False
+                if officer not in region.setdefault("scenery", []):
+                    region["scenery"].append(officer)
 
     @classmethod
     def from_dict(cls, data):

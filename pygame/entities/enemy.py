@@ -33,6 +33,16 @@ ENEMY_CONFIGS = {
         "drop": {"id": "herb", "chance": 0.0, "min": 1, "max": 1},
         "xp_reward": 28,
     },
+    "red_officer": {
+        "name": "OFICIAL VERMELHO", "faction": "red", "scripted_encounter": True,
+        "max_hp": 320, "damage": 11, "speed": 3.25,
+        "perception": 700, "attack_range": 88, "cooldown": 12,
+        "frame_size": 192, "scale": 94 / 192, "hitbox_radius": 20,
+        "idle_frames": 8, "move_frames": 6, "attack_frames": 4,
+        "hurt_frames": 1, "death_frames": 1,
+        "drop": {"id": "herb", "chance": 0, "min": 1, "max": 1},
+        "xp_reward": 0,
+    },
     "forest_guardian": {
         "name": "Guardião da Clareira", "max_hp": 180, "damage": 12, "speed": 0.9,
         "perception": 420, "attack_range": 92, "cooldown": 26,

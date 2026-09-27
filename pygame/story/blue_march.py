@@ -26,6 +26,7 @@ COMMANDER_LINES = (
 
 BLUE_FRAME = 192
 BLUE_SIZES = (88, 82, 80, 84)
+COMMANDER_FALLEN_SIZE = 104
 BLUE_TINTS = ((255, 242, 206), (255, 255, 255),
               (220, 235, 255), (245, 235, 220))
 
@@ -42,7 +43,7 @@ def blue_commander_sprite(load):
     return blue_troop_sprite(load, 0)
 
 
-def blue_fallen_sprite(sheet, draw_size=BLUE_SIZES[0], angle=-76):
+def blue_fallen_sprite(sheet, draw_size=COMMANDER_FALLEN_SIZE, angle=-76):
     frame = pygame.transform.scale(sheet.subsurface((0, 0, BLUE_FRAME, BLUE_FRAME)),
                                    (draw_size, draw_size))
     return pygame.transform.rotate(frame.subsurface(frame.get_bounding_rect()), angle)

@@ -1,4 +1,4 @@
-"""The wounded blue commander and the red officer's final line of 2E."""
+"""The wounded commander, the red officer and the verbal confrontation (2E–3A)."""
 import pygame
 
 from entities.npc import NPC
@@ -30,6 +30,48 @@ OFFICER_LINES = (
     ("Protagonista", "Você também me conhece?"),
     ("Oficial Vermelho", "Conhecer você?"),
     ("Oficial Vermelho", "Eu enterrei você."),
+)
+
+
+# Each chunk ends at a deliberate pause or a change in posture/attention.
+CONFRONTATION = (
+    ("question", (
+        ("Oficial Vermelho", "Onde esteve?"),
+        ("Protagonista", "Não sei."),
+        ("Oficial Vermelho", "O que fizeram com você?"),
+        ("Protagonista", "Eu não sei.")), 350),
+    ("red_dead", (
+        ("Oficial Vermelho", "E eles?"),
+        ("Protagonista", "Tentaram me matar."),
+        ("Oficial Vermelho", "Claro que tentaram.")), 250),
+    ("blue_dead", (
+        ("Oficial Vermelho", "Encontraram você caminhando entre aqueles uniformes."),
+        ("Protagonista", "Eu não faço parte deles."),
+        ("Oficial Vermelho", "Eles não tinham como saber.")), 500),
+    ("guilt", (
+        ("Oficial Vermelho", "Alguns daqueles homens atravessaram meio continente quando ouviram rumores de que você estava vivo."),
+        ("Oficial Vermelho", "Eles conheciam seu nome."),
+        ("Oficial Vermelho", "Você matou todos sem conseguir lembrar o deles.")), 450),
+    ("name", (
+        ("Protagonista", "Existe um nome."),
+        ("Protagonista", "Na minha cabeça."),
+        ("Protagonista", "Desde que acordei.")), 450),
+    ("five", (("Protagonista", "Cinco letras."),), 350),
+    ("reaction", (
+        ("Oficial Vermelho", "..."),
+        ("Oficial Vermelho", "Você ainda consegue senti-lo?"),
+        ("Protagonista", "Sentir?"),
+        ("Oficial Vermelho", "Não lembrar.")), 350),
+    ("feel", (
+        ("Oficial Vermelho", "Sentir."),
+        ("Protagonista", "Quem é █████?")), 280),
+    ("demand", (
+        ("Oficial Vermelho", "Então deixaram até isso."),
+        ("Protagonista", "Quem é?!")), 100),
+    ("commander", (("Comandante Azul", "Não diga."),), 300),
+    ("silence", (("Protagonista", "Você sabe também."),), 550),
+    ("knows", (("Oficial Vermelho", "Claro que sabe."),), 350),
+    ("ready", (("Oficial Vermelho", "Eles sempre souberam."),), 0),
 )
 
 
@@ -70,10 +112,17 @@ class _ShownInsignia:
 class _RedOfficer(NPC):
     """Tiny Swords officer sprite with explicit left/right inspection turns."""
 
-    def draw(self, canvas, camera):
+    @property
+    def depth(self):
+        return self.y
+
+    def draw(self, canvas, camera, player=None):
         sheet = self.run_sprite if self.running and self.run_sprite else self.sprite
         frame_count = max(1, sheet.get_width() // self.frame_size)
         frame_index = (self.anim_tick // 5) % frame_count if self.running else 0
+        if getattr(self, "guarded", False):
+            sheet = self.guard_sprite
+            frame_index = 2
         frame = sheet.subsurface((frame_index * self.frame_size, 0,
                                   self.frame_size, self.frame_height)).copy()
         if self.facing == 1:
@@ -81,9 +130,26 @@ class _RedOfficer(NPC):
         source_foot = frame.get_bounding_rect().bottom
         scaled_height = max(1, round(self.draw_size * self.frame_height / self.frame_size))
         frame = pygame.transform.scale(frame, (self.draw_size, scaled_height))
+        if getattr(self, "state", None) == "DEFEATED":
+            frame = pygame.transform.rotate(frame.subsurface(frame.get_bounding_rect()), -55)
+            canvas.blit(frame, (round(self.x - frame.get_width() / 2 - camera[0]),
+                                round(self.y - frame.get_height() / 2 - camera[1])))
+            return
         foot = round(source_foot * scaled_height / self.frame_height)
         canvas.blit(frame, (round(self.x - self.draw_size / 2 - camera[0]),
                             round(self.y - foot - camera[1])))
+
+
+def create_waiting_officer(load, position):
+    base = "sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/"
+    actor = _RedOfficer("red_officer_scene", "Oficial Vermelho", position, {},
+                        load(base + "Warrior_Idle.png"),
+                        run_sprite=load(base + "Warrior_Run.png"),
+                        frame_size=192, draw_size=94)
+    actor.guard_sprite = load(base + "Warrior_Attack1.png")
+    actor.guarded = False
+    actor.facing = 2
+    return actor
 
 
 class RedOfficerScene:
@@ -108,18 +174,42 @@ class RedOfficerScene:
             region["objects"].remove(commander_prop)
         badge = region["forest_battlefield_interactables"]["insignia"].image
         self.shown_insignia = _ShownInsignia(player, badge)
-        idle = load("sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/Warrior_Idle.png")
-        run = load("sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/Warrior_Run.png")
-        self.officer = _RedOfficer(
-            "red_officer_scene", "Oficial Vermelho", (0, 0), {},
-            idle, run_sprite=run, frame_size=192, draw_size=94)
-        self.officer.x = player.x - 260
-        self.officer.y = player.y - 4
+        self.officer = region.get("red_officer_actor")
+        if self.officer is None:
+            self.officer = create_waiting_officer(load, (player.x - 260, player.y - 4))
+        if self.officer in region.get("scenery", []):
+            region["scenery"].remove(self.officer)
+        region["red_officer_actor"] = self.officer
         self.officer.running = False
         self.officer_target_x = player.x - 112
+        self.continuation_actor = None
+        self.continuation_index = -1
         self.player.facing = 2
         self.player.walk_frame = 0
-        self.dialogue.open(self.dialogue_actor)
+        if story.get("red_officer_met"):
+            self._next_confrontation()
+        else:
+            self.dialogue.open(self.dialogue_actor)
+
+    def _next_confrontation(self):
+        self.phase = "confrontation"
+        self.continuation_index += 1
+        if self.continuation_index >= len(CONFRONTATION):
+            return self.finish()
+        action, lines, _ = CONFRONTATION[self.continuation_index]
+        self.officer.facing = 1 if action == "red_dead" else 2
+        self.officer.guarded = action in {"reaction", "ready"}
+        if action == "guilt":
+            self.player.facing = 1
+        elif action == "commander":
+            self.commander.look_back()
+        elif action == "silence":
+            self.player.facing = 2
+        elif action in {"reaction", "ready"}:
+            self.officer.guarded = True
+        self.continuation_actor = ScriptedDialogue(lines)
+        self.dialogue.open(self.continuation_actor)
+        return False
 
     @property
     def world_actors(self):
@@ -132,7 +222,7 @@ class RedOfficerScene:
             self.shown_insignia.x = self.player.x + 16
             self.shown_insignia.y = self.player.y + 1
             actors.append(self.shown_insignia)
-        if self.phase in {"officer_approach", "officer_inspection", "officer_dialogue"}:
+        if self.phase in {"officer_approach", "officer_inspection", "officer_dialogue", "confrontation"}:
             actors.append(self.officer)
         return tuple(actors)
 
@@ -151,7 +241,17 @@ class RedOfficerScene:
             self.officer.y = self.player.y - 4
             self.officer.running = True
         elif closed is self.officer_dialogue:
-            return self.finish()
+            self.story.set("red_officer_met", True)
+            return self._next_confrontation()
+        elif self.continuation_actor is not None and closed is self.continuation_actor:
+            action, _, pause = CONFRONTATION[self.continuation_index]
+            if pause:
+                self.sequence = NarrativeSequence((Beat(
+                    "█████" if action == "feel" else None, pause,
+                    background="world", fade_in_ms=100 if action == "feel" else 0),))
+                self.sequence.start()
+            else:
+                return self._next_confrontation()
         return False
 
     def update(self, delta_ms):
@@ -161,6 +261,8 @@ class RedOfficerScene:
         if self.sequence is not None:
             if self.sequence.update(delta_ms):
                 self.sequence = None
+                if self.phase == "confrontation":
+                    return self._next_confrontation()
                 self.commander.look_back()
                 self.phase = "commander_reaction"
                 self.dialogue.open(self.reaction_actor)
@@ -191,13 +293,29 @@ class RedOfficerScene:
                     break
         return False
 
+    def draw_overlay(self, canvas):
+        # Same brief pale flash used by the pendant's obscured-name memory.
+        if self.sequence is not None and self.sequence.current.text == "█████":
+            elapsed = self.sequence.current.duration_ms - self.sequence.remaining_ms
+            if elapsed < 150:
+                veil = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
+                veil.fill((217, 207, 231, 32))
+                canvas.blit(veil, (0, 0))
+
     def finish(self):
         if not self.active:
             return False
         if self.dialogue.npc in (self.dialogue_actor, self.reaction_actor,
-                                 self.officer_dialogue):
+                                 self.officer_dialogue, self.continuation_actor):
             self.dialogue.npc = None
         self.story.set("red_officer_met", True)
+        self.story.set("red_officer_boss_ready", True)
+        if self.phase not in {"confrontation", "officer_dialogue"}:
+            self.officer.x = self.officer_target_x
+            self.officer.y = self.player.y - 4
+        self.officer.running = False
+        self.officer.facing = 2
+        self.officer.guarded = True
         self.story.apply_to_region(self.region)
         self.sequence = None
         self.active = False

@@ -6,6 +6,7 @@ import environment as env
 from entities.interactable import Interactable
 from story.blue_march import blue_commander_sprite, blue_troop_sprite, blue_fallen_sprite, BLUE_SIZES
 from story.forest_battle import prepare_red_contacts
+from story.forest_confrontation import create_waiting_officer
 
 WORLD=(2048,1152)
 TREES=[(175,120),(320,245),(525,72),(820,155),(1060,105),(1120,270),(450,410),
@@ -156,4 +157,6 @@ def build(load):
                 (1460 - commander_fallen.get_width() // 2,
                  520 - commander_fallen.get_height() // 2)),
             'wounded_commander_sprite': commander_sheet,
+            'create_waiting_officer': lambda: create_waiting_officer(load, (1348, 516)),
+            'red_officer_factory': lambda: create_waiting_officer(load, (1460, 520)),
             'red_officer_trigger': (1460, 520)}

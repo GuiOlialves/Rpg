@@ -11,6 +11,7 @@ from entities.npc import nearest
 from entities.player import Player
 from systems.dialogue import DialogueBox, DialogueSystem
 from systems.combat import CombatSystem
+from systems import red_officer_encounter
 from systems.equipment import item
 from systems.inventory import add_inventory_item, apply_inventory_action
 from systems.items import consumable
@@ -25,6 +26,7 @@ from story.forest_battle import (
     InsigniaMemoryScene, RedAmbushScene, spawn_red_group,
 )
 from story.forest_confrontation import RedOfficerScene
+from story.prologue_3c import Prologue3CScene
 from story.story_manager import StoryManager
 from ui import defeat_screen as game_over
 from ui.character_menu import attribute_key_at
@@ -49,9 +51,10 @@ class Game:
         spawn_enemies = self.world.spawn_enemies
         reset_forest_boss_encounter = self.world.reset_forest_boss_encounter
         restore_player_after_death = self.restore_player_after_death
-        pygame.init(); pygame.display.set_caption("O Vale RPG | v0.23")
+        pygame.init(); pygame.display.set_caption("O Vale RPG | v0.3")
         screen = pygame.display.set_mode(WINDOW); canvas = pygame.Surface(VIEW); clock = pygame.time.Clock()
-        player = Player(load("assets/player/f_player_sheet.png"), load("assets/player/f_player_attack_sheet.png"))
+        player = Player(load("assets/player/f_player_sheet.png"),
+                        load("assets/player/f_player_attack_sheet.png"))
         story = StoryManager({
             "woke_up": False,
             "saw_silhouette": False,
@@ -60,6 +63,9 @@ class Game:
             "forest_massacre_discovered": False,
             "red_insignia_found": False,
             "red_officer_met": False,
+            "red_officer_memory_seen": False,
+            "red_officer_escaped": False,
+            "prologue_completed": False,
             "forest_battle_progress": 0,
         })
         narrative = opening_sequence()
@@ -72,6 +78,7 @@ class Game:
         forest_ambush_scene = None
         insignia_memory_scene = None
         red_officer_scene = None
+        prologue_3c_scene = None
         current_region = "home"
         region = build_region(current_region)
         story.apply_to_region(region)
@@ -145,6 +152,7 @@ class Game:
                 quest_manager.notice = "Save inválido ou corrompido; jogo atual preservado."
                 quest_manager.notice_timer = 180
                 return False
+            red_officer_encounter.stop(region, enemies)
             player, inventory, quest_manager = loaded.player, loaded.inventory, loaded.quests
             current_region, region, enemies = loaded.region_id, loaded.region, loaded.enemies
             story = loaded.story
@@ -155,6 +163,7 @@ class Game:
             forest_ambush_scene = None
             insignia_memory_scene = None
             red_officer_scene = None
+            prologue_3c_scene = None
             if current_region == "village" and story.get("slime_quest_started"):
                 restore_resident(region, load("assets/npc/civilian_customer.png"))
             if not story.get("woke_up"):
@@ -174,7 +183,9 @@ class Game:
             inventory_ui = {"tab": "TODOS", "selected": None, "consumable_cooldown": 0}
             autosave_allowed = True
             game_over_screen = None
-            quest_manager.notice = "Jogo carregado."
+            quest_manager.notice = ("[E] Enfrentar o Oficial Vermelho."
+                                    if story.get("red_officer_boss_ready") and not story.get("red_officer_defeated")
+                                    else "Jogo carregado.")
             quest_manager.notice_timer = 180
             return True
 
@@ -184,7 +195,7 @@ class Game:
             nonlocal dialogue, ui_mode, inventory_ui, hitstop_frames, game_over_screen
             nonlocal area_transition, transition_fade, arrival_scene, alden_scene
             nonlocal house_memory_scene, blue_march_scene, forest_ambush_scene
-            nonlocal insignia_memory_scene, red_officer_scene, autosave_allowed
+            nonlocal insignia_memory_scene, red_officer_scene, prologue_3c_scene, autosave_allowed
             nonlocal debug_session_active
             preset = create_checkpoint(
                 checkpoint_id, load=load, build_region=build_region,
@@ -205,19 +216,36 @@ class Game:
             transition_fade = FadeOverlay()
             arrival_scene = alden_scene = house_memory_scene = None
             blue_march_scene = forest_ambush_scene = None
-            insignia_memory_scene = red_officer_scene = None
+            insignia_memory_scene = red_officer_scene = prologue_3c_scene = None
             checkpoint_menu.checkpoint_id = checkpoint_id
             checkpoint_menu.close()
             debug_session_active = True
             autosave_allowed = False
 
+        def begin_officer_battle():
+            nonlocal enemies
+            boss = red_officer_encounter.start(region, story, load)
+            if boss is not None:
+                enemies = [boss]
+                return True
+            return False
+
         def continue_after_death():
             nonlocal region, enemies, damage_numbers, hitstop_frames, ui_mode
             nonlocal game_over_screen, inventory_ui
-            if (current_region == "forest" and quest_manager.forest_event_started
+            retry_officer = (current_region == "forest" and story.get("red_officer_boss_ready")
+                             and not story.get("red_officer_defeated"))
+            if retry_officer:
+                region = build_region("forest")
+                story.apply_to_region(region)
+                region["spawn"]["village"] = (1460, 555)
+                enemies = []
+            elif (current_region == "forest" and quest_manager.forest_event_started
                     and not quest_manager.forest_boss_defeated):
                 region, enemies = reset_forest_boss_encounter()
             restore_player_after_death(player, current_region, region, enemies)
+            if retry_officer:
+                begin_officer_battle()
             player.sp_idle_frames = 0
             damage_numbers = []
             hitstop_frames = 0
@@ -404,11 +432,25 @@ class Game:
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
                         if red_officer_scene.finish():
                             autosave_pending = True
+                            begin_officer_battle()
                         red_officer_scene = None
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                         if red_officer_scene.advance():
                             autosave_pending = True
+                            begin_officer_battle()
                             red_officer_scene = None
+                    continue
+                if prologue_3c_scene is not None and prologue_3c_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_F4:
+                        if prologue_3c_scene.finish():
+                            autosave_pending = True
+                            prologue_3c_scene = None
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        if prologue_3c_scene.advance():
+                            autosave_pending = True
+                            prologue_3c_scene = None
                     continue
                 command = input_handler.route(
                     event, ui_mode=ui_mode, dialogue=dialogue, player=player,
@@ -453,6 +495,13 @@ class Game:
                     else:
                         running = False
                 elif command.name == "interact":
+                    officer = region.get("red_officer_actor")
+                    if (not dialogue.active and ui_mode is None and officer is not None
+                            and story.get("red_officer_boss_ready")
+                            and not story.get("red_officer_defeated")
+                            and (player.x - officer.x) ** 2 + (player.y - officer.y) ** 2 <= 160 ** 2
+                            and begin_officer_battle()):
+                        continue
                     if dialogue.active:
                         closing_target = dialogue.npc
                         quest_state = quest_manager.get("forest_trouble").state
@@ -557,8 +606,18 @@ class Game:
             elif red_officer_scene is not None and red_officer_scene.active:
                 if red_officer_scene.update(delta_ms):
                     autosave_pending = True
+                    begin_officer_battle()
                     red_officer_scene = None
+            elif prologue_3c_scene is not None and prologue_3c_scene.active:
+                if prologue_3c_scene.update(delta_ms):
+                    autosave_pending = True
+                    prologue_3c_scene = None
+                elif prologue_3c_scene.autosave_requested:
+                    autosave_pending = True
+                    prologue_3c_scene.autosave_requested = False
             elif game_over_screen is not None:
+                pass
+            elif story.get("prologue_completed"):
                 pass
             elif hitstop_frames > 0:
                 hitstop_frames -= 1
@@ -573,7 +632,16 @@ class Game:
                 for feedback in combat_frame.feedback:
                     damage_numbers.append(DamageNumber(
                         feedback.text, *feedback.position, feedback.color, feedback.critical))
+                if red_officer_encounter.conclude(region, story, enemies):
+                    autosave_pending = True
+                if (current_region == "forest" and story.get("red_officer_defeated")
+                        and not story.get("prologue_completed")
+                        and prologue_3c_scene is None and not enemies
+                        and player.hp > 0 and game_over_screen is None):
+                    prologue_3c_scene = Prologue3CScene(
+                        player, story, region, dialogue, load)
                 if combat_frame.player_defeated and game_over_screen is None:
+                    red_officer_encounter.stop(region, enemies)
                     game_over_screen = game_over.GameOverScreen()
                     ui_mode = None
                     dialogue.npc = None
@@ -603,7 +671,7 @@ class Game:
                                 enemies = spawn_forest_red_group(group_index)
                                 autosave_pending = True
                 if (current_region == "forest" and story.wounded_commander_ready
-                        and not story.get("red_officer_met") and not enemies
+                        and not story.get("red_officer_boss_ready") and not enemies
                         and player.hp > 0 and game_over_screen is None):
                     trigger_x, trigger_y = region["red_officer_trigger"]
                     if ((player.x - trigger_x) ** 2 + (player.y - trigger_y) ** 2
@@ -624,6 +692,7 @@ class Game:
                             quest_manager.notice_timer = 150
                         if transition.blocked or transition.region_id == current_region:
                             continue
+                        red_officer_encounter.stop(region, enemies)
                         previous_region = current_region
                         current_region = transition.region_id
                         region, enemies = transition.region, transition.enemies
@@ -660,7 +729,8 @@ class Game:
                 blue_march_scene=blue_march_scene,
                 forest_ambush_scene=forest_ambush_scene,
                 insignia_memory_scene=insignia_memory_scene,
-                red_officer_scene=red_officer_scene, story=story)
+                red_officer_scene=red_officer_scene,
+                prologue_3c_scene=prologue_3c_scene, story=story)
             if debug:
                 draw_debug_overlay(
                     canvas, current_region=current_region, region=region,
@@ -673,6 +743,7 @@ class Game:
                         "forest_ambush_scene": forest_ambush_scene,
                         "insignia_memory_scene": insignia_memory_scene,
                         "red_officer_scene": red_officer_scene,
+                        "prologue_3c_scene": prologue_3c_scene,
                     },
                     dialogue=dialogue, ui_mode=ui_mode,
                     transition_active=area_transition is not None,

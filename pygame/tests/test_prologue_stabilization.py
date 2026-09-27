@@ -96,6 +96,14 @@ class PrologueStabilizationTests(unittest.TestCase):
                 "woke_up": True,
                 "saw_silhouette": True,
                 "slime_quest_started": True,
+                "blue_army_departed": False,
+                "forest_massacre_discovered": False,
+                "red_insignia_found": False,
+                "red_officer_met": False,
+                "red_officer_memory_seen": False,
+                "red_officer_escaped": False,
+                "prologue_completed": False,
+                "forest_battle_progress": 0,
             })
             self.assertEqual(saved["quests"]["forest_trouble"]["state"], ACTIVE)
             self.assertEqual(saved["quests"]["forest_trouble"]["progress"], 0)
