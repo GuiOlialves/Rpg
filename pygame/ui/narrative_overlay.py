@@ -1,7 +1,12 @@
 """Presentation-only rendering for timed narrative beats."""
 import pygame
 
-from ui.text_rendering import draw_veiled_text, veiled_text_width
+from ui.text_rendering import draw_veiled_text, veiled_text_width, draw_veil_pulse
+
+
+def draw_letterbox(canvas):
+    for y in (0, canvas.get_height() - 24):
+        pygame.draw.rect(canvas, (10, 13, 17), (0, y, canvas.get_width(), 24))
 
 
 def _wrap(text, font, max_width):
@@ -30,12 +35,9 @@ def draw_narrative(canvas, sequence, world_renderer=None):
 
     world_backdrop = beat.background == "world"
     if world_backdrop:
-        bar_height = 27
-        pygame.draw.rect(canvas, (10, 13, 17),
-                         (0, 0, canvas.get_width(), bar_height))
-        pygame.draw.rect(canvas, (10, 13, 17),
-                         (0, canvas.get_height() - bar_height,
-                          canvas.get_width(), bar_height))
+        if beat.text and ("*****" in beat.text or "█████" in beat.text):
+            draw_veil_pulse(canvas, beat.duration_ms - sequence.remaining_ms)
+        draw_letterbox(canvas)
 
     if beat.text:
         font = pygame.font.Font(None, 38 if not world_backdrop else 30)

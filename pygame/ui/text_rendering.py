@@ -4,7 +4,7 @@ import re
 import pygame
 
 
-_VEIL = re.compile(r"(█+)")
+_VEIL = re.compile(r"(█+|\*{5})")
 
 
 def veiled_text_width(text, font):
@@ -30,4 +30,16 @@ def draw_veiled_text(surface, text, font, color, position):
         else:
             image = font.render(part, True, color)
             surface.blit(image, (x, y))
+            if part == "*****":
+                # The same absence motif, while retaining the approved stars.
+                pygame.draw.line(surface, color, (x, block_y + block_height),
+                                 (x + image.get_width() - 1, block_y + block_height))
             x += image.get_width()
+
+
+def draw_veil_pulse(canvas, elapsed_ms):
+    """One soft 150 ms pulse shared by every obscured-name beat."""
+    if 0 <= elapsed_ms < 150:
+        veil = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
+        veil.fill((217, 207, 231, round(26 * (1 - elapsed_ms / 150))))
+        canvas.blit(veil, (0, 0))

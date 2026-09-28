@@ -9,3 +9,11 @@ backup_antes_vila/
 savegame.json
 .savegame-*.tmp
 tools/visual_checks/
+
+# Saídas locais de empacotamento do executável.
+.build-venv/
+build/
+build_onefile/
+dist/
+dist_onefile/
+*.spec

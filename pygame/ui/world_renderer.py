@@ -17,6 +17,11 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
     entities = [(y + im.get_height() - 10, im, (x, y)) for im, (x, y) in nature + objects + houses]
     for obj in region.get('scenery',[]):
         entities.append((obj.depth,'scenery',obj))
+    if story_context is not None:
+        for contact in region.get("red_contacts", ()):
+            if (story_context.soldier_defeated(contact.actor.scripted_id)
+                    and contact.actor not in (enemies or ())):
+                entities.append((contact.actor.y, "fallen", contact))
     # Sombras no chão, antes dos corpos e das copas; nunca sobre a interface.
     for actor in ([player] if player else []) + list(enemies or []) + region.get('npcs',[]) + list(scene_actors):
         if getattr(actor, 'has_embedded_shadow', False):
@@ -38,6 +43,8 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
     for _, image, pos in sorted(entities, key=lambda entry: entry[0]):
         if image == 'scenery':
             pos.draw(canvas,camera,player)
+        elif image == "fallen":
+            pos.draw_fallen(canvas, camera)
         elif image == "player" or image == "enemy" or image == "drop" or image == "npc" or image == "interactable":
             pos.draw(canvas, camera)
         else:
@@ -204,7 +211,8 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
     target = nearest(targets, player, interaction_context) if player is not None else None
     if target is not None:
         prompt_top = round(target.y - camera[1] - 78)
-        prompt_top = max(18, min(canvas.get_height() - font.get_height() - 18,
+        prompt_top = max(46 if region.get("ambient_kind") == "home" else 18,
+                         min(canvas.get_height() - font.get_height() - 18,
                                  prompt_top))
         draw_key_prompt(canvas, getattr(target, "prompt", "[E] Interagir"), font,
                         target.x - camera[0], prompt_top)

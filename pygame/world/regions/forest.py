@@ -9,12 +9,14 @@ from story.forest_battle import prepare_red_contacts
 from story.forest_confrontation import create_waiting_officer
 
 WORLD=(2048,1152)
-TREES=[(175,120),(320,245),(525,72),(820,155),(1060,105),(1120,270),(450,410),
-       (170,780),(390,930),(900,950),(1130,790),(1570,680),(1840,770),(1930,980)]
-ROCKS=[(405,470),(780,620),(610,770),(1160,520),(1290,760),(1800,530),(1570,890),(420,1070)]
+TREES=[(175,180),(305,220),(375,145),(240,80), (880,180),(1015,120),(950,280),
+       (325,390),(205,360), (205,790),(325,820),(425,940),
+       (845,970),(1015,980),(1105,865), (1505,675),(1715,765),(1815,910),(1885,720)]
+ROCKS=[(405,470),(780,620),(610,770),(1290,760),(1800,530),(1570,890),(420,1070)]
 ROUTES=[([(0,575),(290,575),(505,520),(730,480),(930,490),(1080,420),(1210,300),(1170,205),(1170,70),(1245,45),(1250,0)],68),
         ([(690,485),(680,300),(590,185)],36), ([(930,490),(760,650),(690,855)],42),
-        ([(1080,420),(1320,485),(1650,520)],40)]
+        ([(1080,420),(1320,485),(1650,520)],40),
+        ([(690,855),(870,875),(1020,690),(1250,660),(1480,610),(1650,520)],28)]
 
 
 def build(load):
@@ -28,27 +30,20 @@ def build(load):
         [((680,840),(260,150)),((1020,690),(225,135)),((470,190),(190,115))],grass_details)
     objects,nature,obstacles,scenery=[],[],[],[]
     trunk=env.tint(env.resize(woods['tree'],3),(192,220,195))
-    tree=pygame.Surface((248,270),pygame.SRCALPHA)
-    crown=trunk.subsurface((0,0,144,138)).copy()
-    tree.blit(env.tint(crown,(190,215,205)),(0,54))
-    tree.blit(env.tint(crown,(215,229,211)),(104,34))
-    tree.blit(trunk,(52,78))
-    tree.blit(crown,(46,2))
-    groves=[tree,env.resize(pygame.transform.flip(tree,True,False),.9),env.resize(tree,1.08)]
+    groves=[trunk,pygame.transform.flip(trunk,True,False)]
     sapling=env.tint(env.resize(woods['sapling'],2),(194,224,194))
     bush=env.tint(env.resize(woods['bush'],1.5),(188,213,180))
-    # Troncos ancorados exatamente nos antigos pontos de colisão.
+    # Every trunk carries its own footprint at the same depth as its artwork.
     for i,(x,y) in enumerate(TREES):
         box=pygame.Rect(x+14,y+52,25,16); obstacles.append(box)
         foot=box.center
         env.patch(terrain,foot,(245,125),(23,55,39,42),i)
         env.shadow(terrain,foot,100,26,42)
-        scenery.append(env.anchored(groves[i%3],foot,True,1,i))
+        scenery.append(env.anchored(groves[i%2],foot,True,1,i))
         if i%3!=1:
             scenery.append(env.anchored(sapling,(foot[0]-10,foot[1]-4),True,1,i+2))
-        for j in range(21):
-            angle=rng.uniform(0,math.tau); radius=rng.randrange(35,135)
-            px,py=round(foot[0]+math.cos(angle)*radius),round(foot[1]+math.sin(angle)*radius*.5)
+        for j,(dx,dy) in enumerate(((-52,4),(-37,20),(44,-8),(56,12),(-16,28),(25,24))):
+            px,py=foot[0]+dx,foot[1]+dy
             if 0<=px<WORLD[0] and 0<=py<WORLD[1] and not path_mask.get_at((px,py)):
                 plant=bush if j%3==0 else grass_details[j%6]
                 scenery.append(env.anchored(plant,(px,py),False,1 if j%4==0 else 0,j))
@@ -81,8 +76,8 @@ def build(load):
         env.shadow(terrain,box.center,29,9,45)
         scenery.append(env.anchored(rock,box.center))
         scenery.append(env.anchored(grass_details[x%6],(x-10,y+29)))
-    lake=pygame.Rect(1360,120,540,330); shallow=pygame.Rect(1200,95,210,92)
-    water=[env.lake(terrain,lake.inflate(-30,-24),310),env.lake(terrain,shallow.inflate(-20,-12),311,(30,20))]
+    lake=pygame.Rect(1360,120,540,330)
+    water=[env.lake(terrain,lake.inflate(-30,-24),310)]
     for x,y in [(1390,155),(1700,270),(1510,420),(1810,385)]:
         obstacles.append(pygame.Rect(x,y,28,22))
         scenery.append(env.anchored(rock,(x+14,y+22)))
@@ -96,14 +91,14 @@ def build(load):
     red_idle = load('sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/Warrior_Idle.png')
     blue_frame = blue_idle.subsurface((0, 0, 192, 192)).copy()
     red_frame = red_idle.subsurface((0, 0, 192, 192)).copy()
-    commander_sheet = blue_commander_sprite(load)
+    commander_sheet = blue_commander_sprite(load, "Fallen")
     commander_fallen = blue_fallen_sprite(commander_sheet)
-    fallen_blue = [blue_fallen_sprite(blue_troop_sprite(load, index), BLUE_SIZES[index], angle)
+    fallen_blue = [blue_fallen_sprite(blue_troop_sprite(load, index, "Fallen"), BLUE_SIZES[index], angle)
                    for index, angle in ((1, 72), (2, -68), (3, 100))]
     blue_sword = pygame.transform.rotate(
-        pygame.transform.scale_by(blue_frame.subsurface((116, 66, 36, 54)), 0.9), 48)
+        pygame.transform.scale_by(blue_frame.subsurface((116, 66, 36, 54)), 0.52), 48)
     blue_shield = pygame.transform.rotate(
-        pygame.transform.scale_by(blue_frame.subsurface((56, 88, 42, 48)), 0.86), -24)
+        pygame.transform.scale_by(blue_frame.subsurface((56, 88, 42, 48)), 0.50), -24)
     red_insignia = pygame.transform.scale(
         red_frame.subsurface((59, 91, 34, 42)), (24, 30))
     transparent = pygame.Surface((1, 1), pygame.SRCALPHA)
@@ -137,7 +132,7 @@ def build(load):
     for pos in [(1460,240),(1610,350),(1790,200),(1670,198)]:objects.append((lily,pos))
     chest=env.crop(load('assets/shared/chest_01.png'),(0,0,16,16),2)
     for pos in [(730,165),(1590,770)]: objects.append((chest,pos))
-    obstacles.extend([lake.inflate(-30,-24),shallow.inflate(-20,-12)])
+    obstacles.append(lake.inflate(-30,-24))
     return {'name':'Floresta Mística','terrain':terrain,'houses':[],'objects':objects,'nature':nature,
             'scenery':scenery,'water':water,'ambient_kind':'forest','obstacles':obstacles,
             'exits':{'village':pygame.Rect(0,520,76,115),'desert':pygame.Rect(1185,0,125,46)},

@@ -2,6 +2,7 @@
 import math
 import pygame
 from entities.enemy import Enemy
+from ui.character_art import draw_character
 
 
 class RedOfficer(Enemy):
@@ -154,11 +155,7 @@ class RedOfficer(Enemy):
 
     def draw(self, canvas, camera, player=None):
         if self.state == "DEFEATED":
-            size = self.config["frame_size"]
-            frame = self.idle_sheet.subsurface((0, 0, size, size))
-            image = pygame.transform.scale(frame, (94, 94))
-            image = pygame.transform.rotate(image.subsurface(image.get_bounding_rect()), -55)
-            canvas.blit(image, (round(self.x - image.get_width() / 2 - camera[0]),
-                                round(self.y - image.get_height() / 2 - camera[1])))
+            draw_character(canvas, camera, self.defeated_sheet, self.x, self.y,
+                           facing=1 if self.facing < 0 else 2)
         else:
             super().draw(canvas, camera)

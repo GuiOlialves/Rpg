@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
+import sys
 import tempfile
 
 import pygame
@@ -17,7 +18,12 @@ from story.story_manager import StoryManager
 
 
 SAVE_VERSION = 1
-SAVE_PATH = Path(__file__).with_name("savegame.json")
+if getattr(sys, "frozen", False):
+    # Executáveis portáteis precisam manter o save fora da pasta temporária
+    # usada pelo modo one-file do empacotador.
+    SAVE_PATH = Path(sys.executable).with_name("savegame.json")
+else:
+    SAVE_PATH = Path(__file__).with_name("savegame.json")
 REGIONS = {"home", "village", "forest", "desert"}
 CHESTS = {"desert_chest_oasis", "desert_chest_ruins", "desert_chest_hidden"}
 STATS = ("vitalidade", "força", "magia", "agilidade")

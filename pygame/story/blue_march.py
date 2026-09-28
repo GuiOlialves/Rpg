@@ -1,8 +1,7 @@
 """One-time blue-army march through the village after the house investigation."""
-import pygame
-
 from entities.npc import NPC
 from story.arrival_scene import ScriptedDialogue
+from ui.character_art import character_sheet, draw_character, fallen_image
 
 
 COMMANDER_LINES = (
@@ -24,29 +23,26 @@ COMMANDER_LINES = (
 )
 
 
-BLUE_FRAME = 192
-BLUE_SIZES = (88, 82, 80, 84)
-COMMANDER_FALLEN_SIZE = 104
-BLUE_TINTS = ((255, 242, 206), (255, 255, 255),
-              (220, 235, 255), (245, 235, 220))
+BLUE_FRAME = 32
+BLUE_SIZES = (48, 48, 48, 48)
+COMMANDER_FALLEN_SIZE = 48
 
 
 def blue_troop_sprite(load, variant=0, animation="Idle"):
-    """One military atlas, with subtle uniform variations shared by fallen poses."""
-    sheet = load("sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/"
-                 f"Units/Blue Units/Warrior/Warrior_{animation}.png").copy()
-    sheet.fill(BLUE_TINTS[variant], special_flags=pygame.BLEND_RGB_MULT)
-    return sheet
+    """The leader and three uniform variants share the same pixel grid."""
+    character = "blue_commander" if variant == 0 else f"blue_soldier_{(variant - 1) % 3}"
+    action = {"Idle": "idle", "Run": "walk", "Fallen": "fallen"}[animation]
+    return character_sheet(load, character, action)
 
 
-def blue_commander_sprite(load):
-    return blue_troop_sprite(load, 0)
+def blue_commander_sprite(load, animation="Idle"):
+    return blue_troop_sprite(load, 0, animation)
 
 
 def blue_fallen_sprite(sheet, draw_size=COMMANDER_FALLEN_SIZE, angle=-76):
-    frame = pygame.transform.scale(sheet.subsurface((0, 0, BLUE_FRAME, BLUE_FRAME)),
-                                   (draw_size, draw_size))
-    return pygame.transform.rotate(frame.subsurface(frame.get_bounding_rect()), angle)
+    # Keep the scene's existing orientation/reaction calls, using drawn poses.
+    return fallen_image(sheet, index=1 if angle == -48 else 0,
+                        facing=2 if angle > 0 else 0, draw_size=draw_size)
 
 
 class BlueTrooper(NPC):
@@ -54,13 +50,8 @@ class BlueTrooper(NPC):
     def draw(self, canvas, camera):
         sheet = self.run_sprite if self.running else self.sprite
         index = (self.anim_tick // 8) % (sheet.get_width() // BLUE_FRAME) if self.running else 0
-        frame = sheet.subsurface((index * BLUE_FRAME, 0, BLUE_FRAME, BLUE_FRAME))
-        if self.facing == 1:
-            frame = pygame.transform.flip(frame, True, False)
-        frame = pygame.transform.scale(frame, (self.draw_size, self.draw_size))
-        foot = self.sprite.subsurface((0, 0, BLUE_FRAME, BLUE_FRAME)).get_bounding_rect().bottom
-        canvas.blit(frame, (round(self.x - self.draw_size / 2 - camera[0]),
-                            round(self.y - foot * self.draw_size / BLUE_FRAME - camera[1])))
+        draw_character(canvas, camera, sheet, self.x, self.y, index,
+                       self.facing, self.draw_size)
 
 
 class BlueMarchScene:
@@ -75,7 +66,7 @@ class BlueMarchScene:
         self.dialogue = dialogue
         self.active = True
         self.phase = "approach"
-        self.lead_x = 280.0
+        self.lead_x = -80.0
         self.dialogue_actor = ScriptedDialogue(COMMANDER_LINES)
         self.actors = self._make_column(load)
         self.player.walk_frame = 0
@@ -123,7 +114,7 @@ class BlueMarchScene:
             return False
         delta_ms = max(0, int(delta_ms))
         if self.phase == "approach":
-            self.lead_x = min(self.APPROACH_X, self.lead_x + delta_ms * 0.16)
+            self.lead_x = min(self.APPROACH_X, self.lead_x + delta_ms * 0.24)
             for actor in self.actors:
                 actor.running = True
                 actor.anim_tick += max(1, round(delta_ms / (1000 / 60)))

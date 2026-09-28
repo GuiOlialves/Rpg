@@ -64,12 +64,14 @@ class HouseMemoryScene:
         self.active = True
         self._actors_visible = False
         self._warm_flash = False
+        self._memory_elapsed = 0
         self._silhouette = None
         self._held_pendant = HeldPendant(player, image) if kind == "pendant" else None
         self.steps = self.PENDANT_STEPS if kind == "pendant" else self.CUP_STEPS
         if kind == "pendant":
             player.walk_frame = 0
             player.invulnerability_timer = 0
+            player.facing = 1  # The empty side of the room leaves the figure readable.
             self._silhouette = Silhouette(load("assets/npc/civilian_seller.png"))
         self._open_step()
 
@@ -90,13 +92,8 @@ class HouseMemoryScene:
     def world_actors(self):
         actors = []
         if self._actors_visible and self._silhouette is not None:
-            directions = {0: (0, 1), 1: (-1, 0), 2: (1, 0), 3: (0, -1)}
-            dx, dy = directions.get(self.player.facing, (0, -1))
-            progress = 0
-            if self.sequence is not None and self.sequence.current is not None:
-                beat = self.sequence.current
-                progress = max(0, beat.duration_ms - self.sequence.remaining_ms)
-            distance = 42 + min(34, progress * 0.045)
+            dx, dy = -1, -.15
+            distance = 42 + min(34, self._memory_elapsed * 0.035)
             self._silhouette.x = self.player.x + dx * distance
             self._silhouette.y = self.player.y + dy * distance
             actors.append(self._silhouette)
@@ -111,6 +108,8 @@ class HouseMemoryScene:
     def update(self, delta_ms, story, region):
         if not self.active:
             return False
+        if self._actors_visible:
+            self._memory_elapsed += max(0, delta_ms)
         if self.sequence is not None:
             if self._warm_flash and self.sequence.current is not None:
                 beat = self.sequence.current
@@ -128,20 +127,14 @@ class HouseMemoryScene:
         return False
 
     def draw_overlay(self, canvas):
+        if self._actors_visible:
+            veil = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
+            veil.fill((36, 44, 67, 48))
+            canvas.blit(veil, (0, 0))
         if self._warm_flash and getattr(self, "_flash_alpha", 0):
             veil = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
             veil.fill((255, 191, 112, self._flash_alpha))
             canvas.blit(veil, (0, 0))
-
-        if (self.kind == "pendant" and self.sequence is not None
-                and self.sequence.current is not None
-                and self.sequence.current.text == "*****"):
-            elapsed = (self.sequence.current.duration_ms
-                       - self.sequence.remaining_ms)
-            if elapsed < 150:
-                veil = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
-                veil.fill((217, 207, 231, 32))
-                canvas.blit(veil, (0, 0))
 
     def finish(self, story, region):
         if not self.active:

@@ -5,6 +5,7 @@ from entities.npc import NPC
 from story.arrival_scene import ScriptedDialogue
 from story.sequence import Beat, NarrativeSequence
 from story.blue_march import blue_fallen_sprite
+from ui.character_art import character_sheet, draw_character
 
 
 REVELATION_LINES = (
@@ -110,7 +111,7 @@ class _ShownInsignia:
 
 
 class _RedOfficer(NPC):
-    """Tiny Swords officer sprite with explicit left/right inspection turns."""
+    """The same uncovered officer in dialogue, combat and the wounded scene."""
 
     @property
     def depth(self):
@@ -122,31 +123,20 @@ class _RedOfficer(NPC):
         frame_index = (self.anim_tick // 5) % frame_count if self.running else 0
         if getattr(self, "guarded", False):
             sheet = self.guard_sprite
-            frame_index = 2
-        frame = sheet.subsurface((frame_index * self.frame_size, 0,
-                                  self.frame_size, self.frame_height)).copy()
-        if self.facing == 1:
-            frame = pygame.transform.flip(frame, True, False)
-        source_foot = frame.get_bounding_rect().bottom
-        scaled_height = max(1, round(self.draw_size * self.frame_height / self.frame_size))
-        frame = pygame.transform.scale(frame, (self.draw_size, scaled_height))
+            frame_index = 1
         if getattr(self, "state", None) == "DEFEATED" and not getattr(self, "standing_up", False):
-            frame = pygame.transform.rotate(frame.subsurface(frame.get_bounding_rect()), -55)
-            canvas.blit(frame, (round(self.x - frame.get_width() / 2 - camera[0]),
-                                round(self.y - frame.get_height() / 2 - camera[1])))
-            return
-        foot = round(source_foot * scaled_height / self.frame_height)
-        canvas.blit(frame, (round(self.x - self.draw_size / 2 - camera[0]),
-                            round(self.y - foot - camera[1])))
+            sheet, frame_index = self.defeated_sprite, 0
+        draw_character(canvas, camera, sheet, self.x, self.y, frame_index,
+                       self.facing, self.draw_size)
 
 
 def create_waiting_officer(load, position):
-    base = "sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/"
     actor = _RedOfficer("red_officer_scene", "Oficial Vermelho", position, {},
-                        load(base + "Warrior_Idle.png"),
-                        run_sprite=load(base + "Warrior_Run.png"),
-                        frame_size=192, draw_size=94)
-    actor.guard_sprite = load(base + "Warrior_Attack1.png")
+                        character_sheet(load, "red_officer"),
+                        run_sprite=character_sheet(load, "red_officer", "walk"),
+                        frame_size=32, draw_size=48)
+    actor.guard_sprite = character_sheet(load, "red_officer", "windup")
+    actor.defeated_sprite = character_sheet(load, "red_officer", "defeated")
     actor.guarded = False
     actor.facing = 2
     return actor
@@ -239,7 +229,7 @@ class RedOfficerScene:
         elif closed is self.reaction_actor:
             self.phase = "officer_approach"
             self.elapsed_ms = 0
-            self.officer.x = self.player.x - 260
+            self.officer.x = self.player.x - 560
             self.officer.y = self.player.y - 4
             self.officer.running = True
         elif closed is self.officer_dialogue:
@@ -270,11 +260,13 @@ class RedOfficerScene:
                 self.dialogue.open(self.reaction_actor)
             return False
         if self.phase == "officer_approach":
-            self.elapsed_ms = min(900, self.elapsed_ms + delta_ms)
-            progress = self.elapsed_ms / 900
-            self.officer.x = self.player.x - 260 + 148 * progress
+            self.elapsed_ms = min(1900, self.elapsed_ms + delta_ms)
+            progress = self.elapsed_ms / 1900
+            self.officer.x = self.player.x - 560 + 448 * progress
             self.officer.anim_tick += max(1, round(delta_ms / (1000 / 60)))
-            if self.elapsed_ms >= 900:
+            if progress > .55:
+                self.player.facing = 1
+            if self.elapsed_ms >= 1900:
                 self.officer.running = False
                 self.phase = "officer_inspection"
                 self.elapsed_ms = 0
@@ -282,8 +274,8 @@ class RedOfficerScene:
                 self.officer.facing = 2  # Commander.
         elif self.phase == "officer_inspection":
             self.elapsed_ms += delta_ms
-            while self.elapsed_ms >= 310 and self.inspection_index < 3:
-                self.elapsed_ms -= 310
+            while self.elapsed_ms >= 420 and self.inspection_index < 3:
+                self.elapsed_ms -= 420
                 self.inspection_index += 1
                 if self.inspection_index == 1:
                     self.officer.facing = 1  # Fallen soldiers.
@@ -296,13 +288,10 @@ class RedOfficerScene:
         return False
 
     def draw_overlay(self, canvas):
-        # Same brief pale flash used by the pendant's obscured-name memory.
+        from ui.text_rendering import draw_veil_pulse
         if self.sequence is not None and self.sequence.current.text == "█████":
             elapsed = self.sequence.current.duration_ms - self.sequence.remaining_ms
-            if elapsed < 150:
-                veil = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
-                veil.fill((217, 207, 231, 32))
-                canvas.blit(veil, (0, 0))
+            draw_veil_pulse(canvas, elapsed)
 
     def finish(self):
         if not self.active:

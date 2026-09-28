@@ -4,6 +4,7 @@ import math
 import random
 import pygame
 from systems.items import consumable
+from ui.character_art import character_sheet, PIVOT
 
 ENEMY_CONFIGS = {
     "slime": {
@@ -27,18 +28,18 @@ ENEMY_CONFIGS = {
         "name": "Soldado Vermelho", "faction": "red", "scripted_encounter": True,
         "max_hp": 62, "damage": 6, "speed": 1.42,
         "perception": 260, "attack_range": 76, "cooldown": 78,
-        "frame_size": 192, "scale": 0.43, "hitbox_radius": 20,
-        "idle_frames": 8, "move_frames": 6, "attack_frames": 4,
+        "frame_size": 32, "scale": 1.5, "hitbox_radius": 20,
+        "idle_frames": 1, "move_frames": 4, "attack_frames": 3,
         "hurt_frames": 1, "death_frames": 1,
         "drop": {"id": "herb", "chance": 0.0, "min": 1, "max": 1},
         "xp_reward": 28,
     },
     "red_officer": {
         "name": "OFICIAL VERMELHO", "faction": "red", "scripted_encounter": True,
-        "max_hp": 320, "damage": 11, "speed": 3.25,
+        "max_hp": 600, "damage": 20, "speed": 3.25,
         "perception": 700, "attack_range": 88, "cooldown": 12,
-        "frame_size": 192, "scale": 94 / 192, "hitbox_radius": 20,
-        "idle_frames": 8, "move_frames": 6, "attack_frames": 4,
+        "frame_size": 32, "scale": 1.5, "hitbox_radius": 20,
+        "idle_frames": 1, "move_frames": 4, "attack_frames": 3,
         "hurt_frames": 1, "death_frames": 1,
         "drop": {"id": "herb", "chance": 0, "min": 1, "max": 1},
         "xp_reward": 0,
@@ -130,6 +131,7 @@ class Enemy:
         self.rng = random.Random(seed + 300)
         # Leve defasagem inicial evita que grupos comecem o primeiro golpe juntos.
         self.attack_cooldown = self.rng.randrange(0, 24)
+        self.visual_variant = (seed + seed // 3) % 3
         self.idle_sheet = load(self._path("Idle"))
         self.move_sheet = load(self._path("Run"))
         self.attack_sheet = load(self._path("Attack"))
@@ -138,8 +140,22 @@ class Enemy:
         size=self.config['frame_size']
         # Pivô constante: não reposicionar cada frame pelo bounding box variável.
         self.visual_foot=self.idle_sheet.subsurface((0,0,size,size)).get_bounding_rect().bottom
+        if self.kind in {"red_soldier", "red_officer"}:
+            character = (f"red_soldier_{self.visual_variant}" if self.kind == "red_soldier"
+                         else "red_officer")
+            self.hurt_sheet = character_sheet(load, character, "hurt")
+            self.death_sheet = character_sheet(load, character, "fallen")
+            self.windup_sheet = character_sheet(load, character, "windup")
+            self.visual_foot = PIVOT[1]
+            if self.kind == "red_officer":
+                self.defeated_sheet = character_sheet(load, character, "defeated")
 
     def _path(self, animation):
+        if self.kind in {"red_soldier", "red_officer"}:
+            character = (f"red_soldier_{self.visual_variant}" if self.kind == "red_soldier"
+                         else "red_officer")
+            action = {"Idle": "idle", "Run": "walk", "Attack": "attack"}[animation]
+            return f"assets/vale_characters/{character}_{action}.png"
         if self.kind == "slime":
             return "sprites_meu/mystic_woods_free_2.2/sprites/characters/slime.png"
         if "sprite_unit" in self.config:
@@ -384,11 +400,25 @@ class Enemy:
         # Cada inimigo possui seu próprio relógio de animação. Usar o relógio
         # global fazia os frames reiniciarem de forma irregular durante HURT.
         index = (self.anim_tick // 8) % max(1, count)
+        own_art = self.kind in {"red_soldier", "red_officer"}
+        if own_art:
+            row = 1 if self.facing < 0 else 2
+            if self.state == "ATTACK":
+                if self.attack_phase == "windup":
+                    sheet = self.windup_sheet
+                    index = (self.anim_tick // 8) % (sheet.get_width() // 32)
+                elif self.attack_phase == "active":
+                    index = 1 if self.phase_timer > 2 else 2
+                elif self.attack_phase == "recovery":
+                    sheet, index = self.idle_sheet, 0
+            elif self.kind == "red_officer" and self.hit_resistance_timer > 0:
+                # A visual hit reaction must not interrupt the duelist's AI.
+                sheet, index = self.hurt_sheet, 0
         size = cfg["frame_size"]
         rect = pygame.Rect(index * size, row * size, size, size)
         if self.kind == "warrior": rect = pygame.Rect(index * size, 0, size, size)
         image = sheet.subsurface(rect).copy()
-        if self.facing < 0: image = pygame.transform.flip(image, True, False)
+        if self.facing < 0 and not own_art: image = pygame.transform.flip(image, True, False)
         scale = cfg["scale"]
         image = pygame.transform.scale(image, (round(image.width * scale), round(image.height * scale)))
         draw_x = round(self.x - image.width / 2 - camera[0])

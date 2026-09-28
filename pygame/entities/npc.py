@@ -1,5 +1,6 @@
 import math
 import pygame
+from ui.character_art import FRAME, draw_character
 
 class NPC:
     def __init__(self, uid, name, position, dialogues, sprite, run_sprite=None,
@@ -50,15 +51,20 @@ class NPC:
         sheet = self.run_sprite if self.running and self.run_sprite else self.sprite
         frame_count = max(1, sheet.get_width() // self.frame_size)
         frame_index = (self.anim_tick // 5) % frame_count if self.running else 0
+        if self.frame_size == FRAME and sheet.get_height() == FRAME * 4:
+            draw_character(canvas, camera, sheet, self.x, self.y, frame_index,
+                           self.facing, self.draw_size)
+            return
         frame = sheet.subsurface((frame_index * self.frame_size, 0,
                                   self.frame_size, self.frame_height)).copy()
-        if self.facing == 1 and (self.running or self.frame_size == 32):
+        if self.facing == 1:
             frame = pygame.transform.flip(frame, True, False)
-        source_foot = frame.get_bounding_rect().bottom
+        source_foot = self.sprite.subsurface((0, 0, self.frame_size,
+                                              self.frame_height)).get_bounding_rect().bottom
         scaled_height = max(1, round(self.draw_size * self.frame_height / self.frame_size))
         frame = pygame.transform.scale(frame, (self.draw_size, scaled_height))
         if self.foot_ratio is None:
-            foot_offset = round(source_foot * scaled_height / self.frame_height)
+            foot_offset = math.ceil(source_foot * scaled_height / self.frame_height)
         else:
             foot_offset = round(self.foot_ratio * scaled_height)
         canvas.blit(frame, (round(self.x - self.draw_size / 2 - camera[0]),

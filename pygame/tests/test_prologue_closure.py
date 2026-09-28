@@ -53,19 +53,21 @@ class PrologueClosureTests(unittest.TestCase):
         civilians = village["npcs"]
         self.assertEqual({npc.uid for npc in civilians}, {"alden", "mira", "tomas"})
         for npc in civilians:
-            self.assertEqual(npc.sprite.get_height(), npc.frame_height)
+            self.assertEqual(npc.sprite.get_height(), npc.frame_height * 4)
             self.assertEqual(npc.sprite.get_width() % npc.frame_size, 0)
             for running in (False, True):
                 npc.running = running
-                for frame_index in range(npc.sprite.get_width() // npc.frame_size):
-                    npc.anim_tick = frame_index * 5
-                    canvas = pygame.Surface((180, 140), pygame.SRCALPHA)
-                    npc.x, npc.y = 90, 92
-                    npc.draw(canvas, (0, 0))
-                    bounds = canvas.get_bounding_rect()
-                    self.assertGreater(bounds.height, 0, npc.uid)
-                    self.assertEqual(bounds.bottom, 92,
-                                     f"{npc.uid}: feet not grounded on frame {frame_index}")
+                for facing in range(4):
+                    npc.facing = facing
+                    for frame_index in range(npc.sprite.get_width() // npc.frame_size):
+                        npc.anim_tick = frame_index * 5
+                        canvas = pygame.Surface((180, 140), pygame.SRCALPHA)
+                        npc.x, npc.y = 90, 92
+                        npc.draw(canvas, (0, 0))
+                        bounds = canvas.get_bounding_rect()
+                        self.assertGreater(bounds.height, 0, npc.uid)
+                        self.assertEqual(bounds.bottom, 92,
+                                         f"{npc.uid}: feet not grounded on frame {frame_index}, facing {facing}")
 
     def test_reentry_fades_in_and_back_out_without_replaying_completed_prologue(self):
         with tempfile.TemporaryDirectory() as directory:

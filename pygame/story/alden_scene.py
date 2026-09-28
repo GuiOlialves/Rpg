@@ -52,7 +52,7 @@ class AldenScene:
          ("Alden", "Qual?")),
         Beat(None, 600, background="world"),  # He tries to answer.
         (("Protagonista", "..."),),
-        Beat("*****", 2600, background="world"),
+        Beat("*****", 1100, background="world"),
         (("Protagonista", "Não consigo dizer."),),
         Beat(None, 700, background="world"),  # A concerned silence.
         (("Alden", "Talvez não devesse forçar."),

@@ -36,13 +36,15 @@ def restore_resident(region, sprite):
     if existing is not None:
         return existing
     actor = NPC("prologue_villager", "Morador", (582, 598), RESIDENT_DIALOGUES,
-                sprite, frame_size=32, draw_size=64)
+                sprite, frame_size=32, draw_size=48)
     enable_resident(actor, region)
     return actor
 
 
 class ScriptedDialogue:
     """DialogueBox-compatible lines with a speaker that can change per line."""
+
+    scripted = True
 
     def __init__(self, lines):
         self.lines = tuple(lines)
@@ -60,13 +62,13 @@ class Silhouette:
     def __init__(self, sheet):
         frame = sheet.subsurface((0, 0, 32, 32)).copy()
         frame.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
-        self.image = pygame.transform.scale_by(frame, 2)
+        self.image = pygame.transform.scale(frame, (48, 48))
         self.x = self.y = 0
         self.config = {"hitbox_radius": 10}
 
     def draw(self, canvas, camera):
-        canvas.blit(self.image, (round(self.x - 32 - camera[0]),
-                                 round(self.y - 58 - camera[1])))
+        canvas.blit(self.image, (round(self.x - 24 - camera[0]),
+                                 round(self.y - 42 - camera[1])))
 
 
 class ArrivalScene:
@@ -112,7 +114,7 @@ class ArrivalScene:
         self.actor = NPC(
             "prologue_villager", "Morador", (0, 0), {"default": []},
             idle_sprite, run_sprite=run_sprite, frame_size=32,
-            draw_size=64)
+            draw_size=48)
         self.actor.enabled = False
         self.region = region
         self.dialogue_actor = ScriptedDialogue(self.LINES)
@@ -181,7 +183,7 @@ class ArrivalScene:
         if self.phase == "shout":
             story.set("saw_silhouette", True)
         elif self.phase == "run":
-            self.actor.x = self.player.x + 390
+            self.actor.x = self.player.x + 570
             self.actor.y = self.player.y + 8
             self.actor.running = True
             self.actor.enabled = False
@@ -232,7 +234,7 @@ class ArrivalScene:
         if phase in {"flash_near", "flash_gone"}:
             flash = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
             progress = min(1, self.elapsed_ms / self.PHASES[self.phase_index][1])
-            flash.fill((240, 236, 215, round(165 * math.sin(math.pi * progress))))
+            flash.fill((240, 236, 215, round(85 * math.sin(math.pi * progress))))
             canvas.blit(flash, (0, 0))
 
         if self.text:

@@ -1,10 +1,25 @@
 # O Vale — RPG em Pygame
 
-**Versão 0.21** · RPG 2D top-down desenvolvido em Python com Pygame CE.
+**Versão 0.33** · RPG 2D top-down desenvolvido em Python com Pygame CE.
 
 Veja o [histórico de atualizações](CHANGELOG.md) para um resumo breve de cada versão.
 
 O jogo reúne exploração, combate e progressão em três áreas conectadas: Vila do Vale, Floresta Mística e Deserto das Dunas. O prólogo acompanha o protagonista da missão dos Slimes até o encontro com o Oficial Vermelho, passando pela investigação da casa e pelas primeiras memórias. A versão também inclui equipamentos, inventário, atributos e salvamento da recompensa dos baús do deserto durante a sessão. O encontro antigo com o Guardião permanece no código, mas não é ativado pela conclusão da missão inicial.
+
+### Estado atual
+
+O Prólogo — O Nome que Falta está completo até o encerramento. Vila, Casa, Floresta e Deserto, combate, boss do Oficial Vermelho, cutscenes, Save/Load, debug, checkpoints narrativos, inventário e progressão já estão presentes. O projeto está temporariamente pausado/arquivado; não implementar o Capítulo 1 ainda.
+
+O protagonista e suas animações atuais ainda não representam a qualidade visual desejada.
+
+### Próximos passos
+
+1. Melhorar as animações do protagonista.
+2. Recuperar ou refazer a animação de ataque de espada.
+3. Finalizar a integração e o refino do novo estilo de sprites.
+4. Fazer a revisão visual final do prólogo.
+5. Testar o prólogo completo como jogador, sem debug.
+6. Somente depois iniciar o Capítulo 1.
 
 ## Executar
 

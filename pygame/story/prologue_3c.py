@@ -5,6 +5,7 @@ import pygame
 from entities.npc import NPC
 from story.arrival_scene import ScriptedDialogue, Silhouette
 from story.sequence import Beat, NarrativeSequence
+from entities.player import frame
 
 OPENING = (
     ("Protagonista", "Quem sou eu?"),
@@ -51,10 +52,10 @@ class _PastProtagonist:
         self.x, self.y = player.x + 17, player.y + 3
         self.depth = self.y
     def draw(self, canvas, camera, player=None):
-        layer = pygame.Surface(canvas.get_size(), pygame.SRCALPHA)
-        self.player.draw(layer, camera)
-        layer.fill((150, 44, 47, 255), special_flags=pygame.BLEND_RGBA_MULT)
-        canvas.blit(layer, (0, 0))
+        image = pygame.transform.scale(frame(self.player.idle, 0, 1), (96, 96))
+        image.fill((214, 135, 139, 255), special_flags=pygame.BLEND_RGBA_MULT)
+        canvas.blit(image, (round(self.x - 48 - camera[0]),
+                            round(self.y - 72 - camera[1])))
 
 
 class _PlacedObject:
@@ -83,12 +84,16 @@ class Prologue3CScene:
         self.pendant_visible = False
         self.silhouette = Silhouette(load("assets/npc/civilian_seller.png"))
         self.past_player = _PastProtagonist(player)
-        sheet = load("sprites_meu/Tiny Swords (Free Pack)/Tiny Swords (Free Pack)/Units/Red Units/Warrior/Warrior_Idle.png")
+        # A visual stage in an existing clearing; the actual player never moves.
+        self.memory_center = (1010, 710)
+        rng = random.Random(90210)
+        self.rain = [(rng.randrange(1024), rng.randrange(576)) for _ in range(44)]
+        sheet = load("assets/vale_characters/red_soldier_0_idle.png")
         offsets = ((-150,-34),(-96,-42),(94,-42),(151,-34),(-160,40),(-104,48),(108,48),(164,38))
         self.memory_soldiers = []
         for i,(dx,dy) in enumerate(offsets):
             actor=NPC(f"promise_memory_soldier_{i}","Soldado Vermelho",
-                      (player.x+dx,player.y+dy),{},sheet,frame_size=192,draw_size=72)
+                      (self.memory_center[0]+dx,self.memory_center[1]+dy),{},sheet,frame_size=32,draw_size=48)
             actor.enabled=False
             actor.facing=2 if dx<0 else 1
             self.memory_soldiers.append(actor)
@@ -173,7 +178,10 @@ class Prologue3CScene:
             self.index+=1
             if self.index<len(MEMORY):
                 if self.index==1: self.pendant_visible=True
-                self._dialogue((MEMORY[self.index],),"memory")
+                if self.index == 4:
+                    self._pause(900, "memory_pause", "promise_reply")
+                else:
+                    self._dialogue((MEMORY[self.index],),"memory")
             else:
                 self._pause(520,"memory_end","after_memory","*****","out")
         elif self.phase=="after_memory":
@@ -188,14 +196,19 @@ class Prologue3CScene:
         return False
 
     @property
+    def memory_visible(self):
+        return self.phase in {"memory_transition", "memory", "memory_pause", "memory_end"}
+
+    @property
     def world_actors(self):
         if not self.active: return ()
-        if self.phase=="memory":
-            self.silhouette.x,self.silhouette.y=self.player.x-48,self.player.y+2
-            self.past_player.x,self.past_player.y=self.player.x+20,self.player.y+2
+        if self.memory_visible:
+            x, y = self.memory_center
+            self.silhouette.x,self.silhouette.y=x-38,y+2
+            self.past_player.x,self.past_player.y=x+30,y+2
             actors=list(self.memory_soldiers)+[self.past_player,self.silhouette]
             if self.pendant_visible:
-                actors.append(_PlacedObject(self.pendant,self.player.x-8,self.player.y-28))
+                actors.append(_PlacedObject(self.pendant,x-8,y-28))
             return tuple(actors)
         actors=[]
         if self.officer is not None and self.phase not in {"epilogue","epilogue_looks","ending"}: actors.append(self.officer)
@@ -224,8 +237,9 @@ class Prologue3CScene:
         if self.phase=="flee":
             self.elapsed_ms+=delta_ms
             if self.officer is not None:
-                self.officer.x+=delta_ms*.14
-                self.officer.y-=delta_ms*.035
+                t = min(1, self.elapsed_ms / 2200)
+                self.officer.x = self.flee_start[0] + (self.flee_target[0] - self.flee_start[0]) * t
+                self.officer.y = self.flee_start[1] + (self.flee_target[1] - self.flee_start[1]) * t
                 self.officer.anim_tick+=max(1,round(delta_ms/(1000/60)))
             if self.elapsed_ms>=2200:
                 self.officer.running=False
@@ -235,8 +249,8 @@ class Prologue3CScene:
                 self.elapsed_ms=0
         elif self.phase=="epilogue_looks":
             self.elapsed_ms+=delta_ms
-            self.player.facing=(1,3,2)[min(2,self.elapsed_ms//600)]
-            if self.elapsed_ms>=1800:
+            self.player.facing=(1,3,2)[min(2,self.elapsed_ms//1200)]
+            if self.elapsed_ms>=3600:
                 self.index=0
                 self.pendant_visible=True
                 self._dialogue((EPILOGUE[0],),"epilogue")
@@ -249,6 +263,8 @@ class Prologue3CScene:
                 self.index=0
                 self._dialogue((MEMORY[0],),"memory")
                 if self.officer:self.officer.running=True
+            elif action=="promise_reply":
+                self._dialogue((MEMORY[self.index],), "memory")
             elif action=="after_memory":
                 self._pause(360,"memory_return","begin_after",fade="in")
             elif action=="begin_after":
@@ -267,7 +283,10 @@ class Prologue3CScene:
                 self.elapsed_ms=0
                 if self.officer:
                     self.officer.running=True
-                    self.officer.facing=1
+                    self.officer.facing=2
+                    self.flee_start = (self.officer.x, self.officer.y)
+                    self.flee_target = (max(self.player.x + 620, self.officer.x + 480),
+                                        min(self.officer.y, self.player.y - 48) - 60)
             elif action=="epilogue_last":
                 self.index=2
                 self._dialogue((EPILOGUE[2],),"epilogue")
@@ -300,20 +319,15 @@ class Prologue3CScene:
         return True
 
     def draw_overlay(self,canvas):
-        if self.phase=="memory":
+        if self.memory_visible:
             veil=pygame.Surface(canvas.get_size(),pygame.SRCALPHA)
-            veil.fill((29,41,72,78))
+            veil.fill((24,32,51,62))
             canvas.blit(veil,(0,0))
-            rng=random.Random(90210);w,h=canvas.get_size()
+            w,h=canvas.get_size()
             offset=(pygame.time.get_ticks()//18)%h
-            for _ in range(82):
-                x,y=rng.randrange(w),(rng.randrange(h)+offset)%h
-                pygame.draw.line(canvas,(166,184,220),(x,y),(x-9,y+28),1)
-        elif self.phase=="memory_end" and self.sequence:
-            elapsed=self.sequence.current.duration_ms-self.sequence.remaining_ms
-            if elapsed<150:
-                veil=pygame.Surface(canvas.get_size(),pygame.SRCALPHA)
-                veil.fill((217,207,231,32));canvas.blit(veil,(0,0))
+            for x,y in self.rain:
+                y=(y+offset)%h
+                pygame.draw.line(canvas,(117,137,161),(x,y),(x-4,y+15),1)
 
     def draw_card(self,canvas):
         canvas.fill((5,7,10))

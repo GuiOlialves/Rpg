@@ -7,8 +7,8 @@ from entities.interactable import Interactable
 from entities.npc import NPC
 from ui.civilian_art import civilian_sheet
 
-HOMES = [(4, 740, 325), (3, 1160, 310), (2, 1370, 230),
-         (1, 730, 665), (3, 1170, 730), (1, 475, 345), (2, 1510, 725)]
+HOMES = [(4, 740, 325), (3, 1160, 310), (2, 1450, 275),
+         (1, 435, 715), (3, 1050, 805), (1, 475, 345), (2, 1510, 745)]
 
 
 def terrain(size, asset):
@@ -16,24 +16,31 @@ def terrain(size, asset):
     grass=[env.resize(asset(f'2 Objects/5 Grass/{i}.png'),2) for i in range(1,7)]
     ground=env.ground(size,asset('1 Tiles/FieldsTile_38.png'),41,((67,98,57),(114,140,73)),grass)
     routes = [([(0, 570), (550, 570), (850, 565), (1030, 565), (1430, 565), (2048, 600)], 68),
-              ([(1020, 0), (1020, 390), (1030, 565), (1020, 840), (980, 1152)], 64)]
+              ([(1040, 295), (1020, 390), (1030, 565), (1020, 735), (975, 880), (1000, 980)], 46)]
     for _, x, y in HOMES:
-        door = (x + 65, y + 125)
-        routes.append(([door, (door[0], 565)], 30))
+        house = asset(f'2 Objects/7 House/{_}.png')
+        door = (x + house.width // 2, y + house.height - 6)
+        # Short front walks join lanes; they no longer run through lower houses.
+        if y > 600:
+            routes.append(([door, (door[0] + 95, door[1] + 24),
+                            (door[0] + 120, 650), (door[0] + 75, 575)], 28))
+        else:
+            routes.append(([door, (door[0] + 12, door[1] + 40), (door[0], 565)], 28))
     routes.append(([(1300, 520), (1320, 670), (1450, 690)], 36))
     paving=env.worn_texture(asset('1 Tiles/FieldsTile_11.png'),(171,148,104),65,41)
     env.paths(ground,routes,paving,41,edge_tiles=grass)
     plaza=pygame.transform.grayscale(asset('1 Tiles/FieldsTile_11.png'))
     plaza.fill((22,23,8),special_flags=pygame.BLEND_RGB_ADD)
     plaza=env.worn_texture(plaza,(163,166,145),105,42)
-    env.paths(ground,[],plaza,45,[((1025,561),(265,205))])
+    env.paths(ground,[],plaza,45,[((1020,553),(325,175))])
     for i,x,y in HOMES:
         house=asset(f'2 Objects/7 House/{i}.png')
         foot=(x+house.width//2,y+house.height-20)
         env.patch(ground,foot,(house.width+44,58),(116,106,70,95),x)
         env.shadow(ground,(foot[0]+8,foot[1]),house.width-8,28,45)
     # Um piso gasto sob as bancas liga comércio e horta à estrada.
-    env.paths(ground,[],paving,55,[((1388,665),(245,70))])
+    env.paths(ground,[([(1345,575),(1348,648),(1440,690)],32)],paving,55,
+              [((1388,660),(260,85)), ((514,866),(130,65))])
     # Horta ao lado da feira: sulcos e folhas em fileiras.
     pygame.draw.rect(ground, (100, 77, 48), (1350, 710, 155, 46), border_radius=6)
     for y in (720, 737):
@@ -83,18 +90,18 @@ def build(asset, flowerbed, sign, load):
         objects.append((image, pos))
         obstacles.append(pygame.Rect(box).move(pos))
     well = pygame.transform.scale_by(exterior.subsurface((0, 496, 40, 44)), 2)
-    solid(well, (984, 442), (10, 59, 60, 28))
-    for pos in [(902, 615), (1090, 615), (893, 452), (1098, 451)]:
+    solid(well, (1060, 430), (10, 59, 60, 28))
+    for pos in [(875, 468), (1090, 615)]:
         solid(bench_image, pos, (4, 20, 56, 10))
-    for pos in [(870, 495), (1160, 493), (915, 659), (1110, 659)]:
-        objects.append((asset('2 Objects/3 Decor/10.png'), pos))
     for i, pos in enumerate([(1270, 600), (1400, 593)]):
         im = asset(f'2 Objects/6 Tent/{i + 1}.png')
         solid(im, pos, (9, im.get_height() - 24, im.get_width() - 18, 20))
-        for j in range(3):
-            objects.append((asset(f'2 Objects/4 Box/{j + 1}.png'), (pos[0] + j * 23, pos[1] + 67)))
-    objects.append((sign(), (1200, 640)))
-    for i, (x, y) in enumerate([(735, 465), (1175, 471), (731, 808), (1180, 887), (864, 694), (1075, 696)]):
+        for j in range(2):
+            crate = asset(f'2 Objects/4 Box/{j + 1}.png')
+            solid(crate, (pos[0] + im.width + 9, pos[1] + 33 + j * 24),
+                  (0, 6, crate.width, crate.height - 6))
+    solid(sign(), (1220, 647), (9, 24, 22, 15))
+    for i, (x, y) in enumerate([(737, 485), (1200, 483), (436, 850), (1080, 983)]):
         nature.append((flowerbed(i), (x, y)))
     # Objetos junto às paredes, contidos no footprint sólido existente das casas.
     for n,(house,(x,y)) in enumerate(houses):
@@ -104,9 +111,11 @@ def build(asset, flowerbed, sign, load):
         for j in range(2):
             plant=env.resize(asset(f'2 Objects/5 Grass/{j+1}.png'),2)
             nature.append((plant,(x+5+j*(house.width-20),y+house.height-19)))
-    objects.append((env.resize(asset('2 Objects/3 Decor/1.png'),1.5),(1490,608)))
-    objects.append((env.resize(asset('2 Objects/3 Decor/6.png'),1.5),(1330,716)))
-    for pos, width in [((698, 640), 120), ((842, 640), 60), ((1305, 757), 208)]:
+    cart = env.resize(asset('2 Objects/3 Decor/1.png'),1.5)
+    solid(cart, (1510,622), (5,18,cart.width-10,18))
+    basket = env.resize(asset('2 Objects/3 Decor/6.png'),1.5)
+    solid(basket, (1320,726), (2,14,basket.width-4,12))
+    for pos, width in [((400, 875), 80), ((551, 875), 80), ((1350, 765), 155)]:
         solid(picket(width), pos, (0, 27, width, 6))
     # Front garden frames the starting house without crossing the exit lane.
     for pos, width in [((412, 456), 72), ((587, 456), 64)]:
@@ -115,12 +124,16 @@ def build(asset, flowerbed, sign, load):
         nature.append((bush_sprite, pos))
     for n, pos in enumerate([(421, 475), (599, 475), (672, 506), (807, 486)]):
         nature.append((flowerbed(n), pos))
-    rng = random.Random(24)
-    tree_positions = [(628, 348), (675, 251), (873, 298), (1293, 349), (1330, 228),
-                      (608, 679), (630, 797), (866, 784), (1296, 816), (1480, 392), (1505, 640),
-                      (260, 350), (245, 680)]
-    for x in range(180, 1900, 95):
-        tree_positions.extend([(x, rng.randrange(35, 140)), (x, rng.randrange(990, 1020))])
+    # Groves frame neighbourhoods instead of two identical rows across the map.
+    tree_positions = [(250,300),(305,245),(205,220), (665,245),(855,245),
+                      (1260,205),(1340,190), (1690,300),(1760,340),
+                      (290,690),(260,780), (710,845),(790,890),
+                      (1310,865),(1390,935), (1740,800),(1800,745),
+                      (160,60),(240,35),(310,95), (620,70),(705,35),
+                      (890,95),(990,40), (1220,45),(1310,80),
+                      (1620,40),(1700,95),(1820,50),
+                      (170,980),(240,1020),(350,995), (650,1005),(745,1035),
+                      (1180,1010),(1270,1040), (1620,1010),(1720,970),(1830,1030)]
     for i, pos in enumerate(tree_positions):
         im = tree_sprite
         nature.append((im, (pos[0]+49-im.width//2,pos[1]+118-im.height)))
@@ -162,15 +175,15 @@ def build_playable(load):
             "COMPLETED": ["Você voltou. Preciso conferir a situação antes de conversarmos melhor."],
             "REWARDED": ["Obrigado novamente pela ajuda."],
             "BOSS_DONE": ["A floresta está mais segura, e o caminho ao norte voltou a ser acessível."]
-        }, civilian_sheet(load, "elder"), frame_size=32, draw_size=64),
+        }, civilian_sheet(load, "elder"), frame_size=32, draw_size=48),
         NPC("mira", "Mira", (1030, 420), {
             "default": ["Encontraram um estranho desacordado perto da estrada ontem.",
                         "Hoje a praça está mais quieta do que de costume."]
-        }, civilian_sheet(load, "shopkeeper"), frame_size=32, draw_size=64),
+        }, civilian_sheet(load, "shopkeeper"), frame_size=32, draw_size=48),
         NPC("tomas", "Tomas", (1430, 540), {
             "default": ["Os Slimes têm rondado a trilha da floresta.",
                         "Ouvi que pediram ajuda, mas ainda vai demorar."]
-        }, civilian_sheet(load, "worker"), frame_size=32, draw_size=64),
+        }, civilian_sheet(load, "worker"), frame_size=32, draw_size=48),
     ]
     for npc in npcs:
         obstacles.append(npc.hitbox)

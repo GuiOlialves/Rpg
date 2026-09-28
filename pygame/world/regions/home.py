@@ -4,6 +4,7 @@ import pygame
 from core.assets import load
 from core.config import VIEW
 from entities.interactable import Interactable
+from ui.text_rendering import draw_veiled_text
 
 
 def piece(sheet, rect, scale=2, isolate=False):
@@ -20,35 +21,37 @@ def build():
     width, height = VIEW
     interior = load("assets/prologue/interior.png")
     walls = load("assets/prologue/walls_floor.png")
-    floor = load("assets/prologue/wooden.png")
+    floor = pygame.transform.scale_by(load("assets/prologue/wooden.png"), 2)
     terrain = pygame.Surface(VIEW)
     terrain.fill((30, 29, 33))
-    for y in range(40, height - 40, floor.get_height()):
-        for x in range(40, width - 40, floor.get_width()):
+    room = pygame.Rect(288, 80, 480, 464)
+    terrain.set_clip(room.inflate(-64, -64))
+    for y in range(112, 512, floor.get_height()):
+        for x in range(320, 736, floor.get_width()):
             terrain.blit(floor, (x, y))
+    terrain.set_clip(None)
     wall_tile = piece(walls, (48, 64, 16, 16))
-    for x in range(40, width - 40, 32):
-        terrain.blit(wall_tile, (x, 8))
-        terrain.blit(wall_tile, (x, height - 32))
-    for y in range(8, height, 32):
-        terrain.blit(wall_tile, (8, y))
-        terrain.blit(wall_tile, (width - 40, y))
-    terrain.blit(piece(interior, (0, 272, 108, 98), scale=1, isolate=True), (460, 303))
-    terrain.blit(piece(walls, (86, 66, 18, 24)), (650, 34))
-    terrain.blit(piece(walls, (86, 66, 18, 24)), (365, 34))
+    for x in range(room.left, room.right, 32):
+        terrain.blit(wall_tile, (x, room.top))
+        terrain.blit(wall_tile, (x, 512))
+    for y in range(room.top, 512, 32):
+        terrain.blit(wall_tile, (room.left, y))
+        terrain.blit(wall_tile, (736, y))
+    terrain.blit(piece(interior, (0, 272, 108, 98), scale=1, isolate=True), (338, 248))
+    terrain.blit(piece(walls, (86, 66, 18, 24)), (350, 92))
+    terrain.blit(piece(walls, (86, 66, 18, 24)), (595, 92))
     light = pygame.Surface(VIEW, pygame.SRCALPHA)
-    for origin in (383, 668):
+    for origin in (368, 613):
         for row in range(100):
             spread = row // 5
             pygame.draw.line(light, (247, 222, 167, round(20 * (1 - row / 100))),
-                             (origin - 11 + row // 4 - spread, 72 + row),
-                             (origin + 11 + row // 4 + spread, 72 + row))
+                             (origin - 11 + row // 4 - spread, 140 + row),
+                             (origin + 11 + row // 4 + spread, 140 + row))
     terrain.blit(light, (0, 0))
-    wall = 40
-    obstacles = [pygame.Rect(0, 0, width, wall),
-                 pygame.Rect(0, height - wall, width, wall),
-                 pygame.Rect(0, 0, wall, height),
-                 pygame.Rect(width - wall, 0, wall, height)]
+    obstacles = [pygame.Rect(0, 0, width, 112),
+                 pygame.Rect(0, 512, width, height - 512),
+                 pygame.Rect(0, 0, 320, height),
+                 pygame.Rect(736, 0, width - 736, height)]
     objects = []
 
     def furniture(rect, pos, footprint=None):
@@ -57,18 +60,15 @@ def build():
         if footprint is not None:
             obstacles.append(pygame.Rect(footprint).move(pos))
 
-    furniture((48, 0, 32, 40), (480, 146), (10, 42, 44, 34))
-    furniture((64, 80, 48, 64), (102, 46), (10, 98, 76, 20))
-    furniture((160, 80, 32, 48), (892, 48), (10, 70, 45, 17))
-    furniture((112, 80, 48, 48), (748, 48), (6, 76, 82, 15))
-    furniture((120, 4, 20, 28), (554, 172), (6, 37, 24, 15))
-    furniture((112, 176, 48, 32), (817, 382), (8, 34, 80, 18))
+    furniture((48, 0, 32, 40), (348, 136), (8, 8, 48, 68))
+    furniture((160, 80, 32, 48), (650, 115), (10, 70, 45, 17))
+    furniture((120, 4, 20, 28), (416, 158), (6, 37, 24, 15))
+    furniture((112, 176, 48, 32), (570, 340), (8, 16, 80, 40))
     # These chair crops stop before the atlas's rug row below them.
-    furniture((8, 216, 16, 24), (785, 347), (3, 34, 22, 14))
-    furniture((36, 216, 16, 24), (916, 392), (3, 34, 22, 14))
-    furniture((48, 48, 32, 32), (104, 430), (5, 43, 49, 17))
-    furniture((152, 0, 28, 32), (162, 429), (10, 42, 29, 17))
-    furniture((36, 368, 24, 32), (88, 325), (8, 47, 26, 12))
+    furniture((8, 216, 16, 24), (530, 344), (3, 34, 22, 14))
+    furniture((36, 216, 16, 24), (678, 344), (3, 34, 22, 14))
+    furniture((48, 48, 32, 32), (346, 414), (5, 43, 49, 17))
+    furniture((152, 0, 28, 32), (410, 414), (10, 42, 29, 17))
     mirror_art = piece(walls, (86, 66, 18, 24))
     mirror_pixels = pygame.PixelArray(mirror_art)
     for source, target in {
@@ -80,11 +80,11 @@ def build():
         mirror_pixels.replace(source, target)
     del mirror_pixels
     mirror = Interactable(
-        "mirror", "Protagonista", (58, 222), mirror_art,
+        "mirror", "Protagonista", (306, 238), mirror_art,
         ["Esse sou eu?", "Não sinto que estou olhando para um estranho.",
          "Mas também não lembro desse rosto."], interaction_radius=70)
     sword = Interactable(
-        "sword", "Protagonista", (950, 238),
+        "sword", "Protagonista", (708, 238),
         piece(interior, (104, 368, 28, 14), scale=2),
         ["Sei como segurar isso.", "Só não sei quem me ensinou."], interaction_radius=70)
     door = Interactable(
@@ -104,37 +104,40 @@ def build():
     # Reuse atlas props; the pack has no standalone paper graphic.
     mug = piece(interior, (80, 372, 20, 24), scale=1)
     pendant = piece(interior, (176, 368, 16, 28), scale=1)
+    mug = pygame.transform.scale(mug, (14, 17))
+    pendant = pygame.transform.scale(pendant, (12, 21))
 
     wall_font = pygame.font.Font(None, 15)
     height_marks = pygame.Surface((173, 17), pygame.SRCALPHA)
-    height_marks.blit(wall_font.render("|  |   | |  ***** — 8 anos", True,
-                                       (205, 187, 151)), (0, 0))
+    draw_veiled_text(height_marks, "|  |   | |  ***** — 8 anos", wall_font,
+                     (205, 187, 151), (0, 0))
     # No standalone letter art exists in this pack; a small parchment prop fits the table.
     letter_image = pygame.Surface((34, 22), pygame.SRCALPHA)
     letter_image.fill((214, 196, 153))
     pygame.draw.rect(letter_image, (111, 82, 52), letter_image.get_rect(), 1)
     for row, width_px in ((5, 25), (9, 22), (13, 24), (17, 17)):
         pygame.draw.line(letter_image, (116, 88, 59), (4, row), (4 + width_px, row), 1)
+    letter_image = pygame.transform.scale(letter_image, (24, 16))
 
-    mug_point = Interactable("second_mug", "Protagonista", (841, 401), mug,
+    mug_point = Interactable("second_mug", "Protagonista", (591, 360), mug,
                              (), interaction_radius=38)
-    mug_point.visual_depth = 437
+    mug_point.visual_depth = 395
     letter_point = Interactable(
-        "damaged_letter", "Protagonista", (871, 400), letter_image,
+        "damaged_letter", "Protagonista", (617, 358), letter_image,
         ("Se você conseguir chegar ao Vale, não deixe que eles...",
          "Chegar ao Vale...", "Então alguém sabia que eu viria para cá."),
         interaction_radius=38)
-    letter_point.visual_depth = 438
+    letter_point.visual_depth = 396
     height_point = Interactable(
-        "height_marks", "Protagonista", (525, 32), height_marks,
+        "height_marks", "Protagonista", (505, 104), height_marks,
         ("Consigo ler tudo.", "...", "Menos isso."), interaction_radius=72)
-    height_point.visual_depth = 40
+    height_point.visual_depth = 112
     pendant_point = Interactable(
-        "broken_pendant", "Protagonista", (898, 404), pendant,
+        "broken_pendant", "Protagonista", (645, 363), pendant,
         (), interaction_radius=74)
-    pendant_point.visual_depth = 439
+    pendant_point.visual_depth = 397
     investigation_interactables = [
-        hotspot("two_chairs", (856, 414),
+        hotspot("two_chairs", (609, 372),
                 ("Duas.", "...", "Eu costumava sentar aqui.", "...", "Como sei disso?"), 78),
         mug_point,
         height_point,

@@ -1,0 +1,287 @@
+{
+  "frame_size": [
+    32,
+    32
+  ],
+  "pivot": [
+    16,
+    28
+  ],
+  "draw_scale": 1.5,
+  "directions": [
+    "down",
+    "left",
+    "right",
+    "up"
+  ],
+  "palette": {
+    "ink": "#29242e",
+    "leather": "#574039",
+    "leather_light": "#886047",
+    "skin_shadow": "#b87956",
+    "skin": "#e0ad78",
+    "linen": "#d6c6a0",
+    "hair": "#4b3742",
+    "hair_light": "#886047",
+    "grey": "#94968b",
+    "steel": "#a5b8b6",
+    "steel_shadow": "#94968b",
+    "blue": "#48688d",
+    "blue_shadow": "#34455f",
+    "blue_light": "#7595b0",
+    "red": "#ad5148",
+    "red_shadow": "#743944",
+    "red_light": "#b87956",
+    "sage": "#7d8764",
+    "sage_shadow": "#58644f",
+    "ochre": "#d2b06a",
+    "gold": "#d2b06a",
+    "hair_glint": "#80687e"
+  },
+  "characters": {
+    "protagonist": {
+      "idle": {
+        "file": "protagonist_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "protagonist_walk.png",
+        "frames_per_direction": 6
+      },
+      "attack": {
+        "file": "protagonist_attack.png",
+        "frames_per_direction": 8
+      }
+    },
+    "civilian_man": {
+      "idle": {
+        "file": "civilian_man_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "civilian_man_walk.png",
+        "frames_per_direction": 4
+      }
+    },
+    "civilian_woman": {
+      "idle": {
+        "file": "civilian_woman_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "civilian_woman_walk.png",
+        "frames_per_direction": 4
+      }
+    },
+    "civilian_elder": {
+      "idle": {
+        "file": "civilian_elder_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "civilian_elder_walk.png",
+        "frames_per_direction": 4
+      }
+    },
+    "civilian_merchant": {
+      "idle": {
+        "file": "civilian_merchant_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "civilian_merchant_walk.png",
+        "frames_per_direction": 4
+      }
+    },
+    "civilian_worker": {
+      "idle": {
+        "file": "civilian_worker_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "civilian_worker_walk.png",
+        "frames_per_direction": 4
+      }
+    },
+    "blue_soldier_0": {
+      "idle": {
+        "file": "blue_soldier_0_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "blue_soldier_0_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "blue_soldier_0_fallen.png",
+        "frames_per_direction": 1
+      }
+    },
+    "blue_soldier_1": {
+      "idle": {
+        "file": "blue_soldier_1_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "blue_soldier_1_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "blue_soldier_1_fallen.png",
+        "frames_per_direction": 1
+      }
+    },
+    "blue_soldier_2": {
+      "idle": {
+        "file": "blue_soldier_2_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "blue_soldier_2_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "blue_soldier_2_fallen.png",
+        "frames_per_direction": 1
+      }
+    },
+    "blue_commander": {
+      "idle": {
+        "file": "blue_commander_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "blue_commander_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "blue_commander_fallen.png",
+        "frames_per_direction": 2
+      }
+    },
+    "red_soldier_0": {
+      "idle": {
+        "file": "red_soldier_0_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "red_soldier_0_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "red_soldier_0_fallen.png",
+        "frames_per_direction": 1
+      },
+      "attack": {
+        "file": "red_soldier_0_attack.png",
+        "frames_per_direction": 3
+      },
+      "windup": {
+        "file": "red_soldier_0_windup.png",
+        "frames_per_direction": 1
+      },
+      "hurt": {
+        "file": "red_soldier_0_hurt.png",
+        "frames_per_direction": 1
+      }
+    },
+    "red_soldier_1": {
+      "idle": {
+        "file": "red_soldier_1_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "red_soldier_1_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "red_soldier_1_fallen.png",
+        "frames_per_direction": 1
+      },
+      "attack": {
+        "file": "red_soldier_1_attack.png",
+        "frames_per_direction": 3
+      },
+      "windup": {
+        "file": "red_soldier_1_windup.png",
+        "frames_per_direction": 1
+      },
+      "hurt": {
+        "file": "red_soldier_1_hurt.png",
+        "frames_per_direction": 1
+      }
+    },
+    "red_soldier_2": {
+      "idle": {
+        "file": "red_soldier_2_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "red_soldier_2_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "red_soldier_2_fallen.png",
+        "frames_per_direction": 1
+      },
+      "attack": {
+        "file": "red_soldier_2_attack.png",
+        "frames_per_direction": 3
+      },
+      "windup": {
+        "file": "red_soldier_2_windup.png",
+        "frames_per_direction": 1
+      },
+      "hurt": {
+        "file": "red_soldier_2_hurt.png",
+        "frames_per_direction": 1
+      }
+    },
+    "red_officer": {
+      "idle": {
+        "file": "red_officer_idle.png",
+        "frames_per_direction": 1
+      },
+      "walk": {
+        "file": "red_officer_walk.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "red_officer_fallen.png",
+        "frames_per_direction": 1
+      },
+      "attack": {
+        "file": "red_officer_attack.png",
+        "frames_per_direction": 3
+      },
+      "windup": {
+        "file": "red_officer_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "red_officer_hurt.png",
+        "frames_per_direction": 1
+      },
+      "defeated": {
+        "file": "red_officer_defeated.png",
+        "frames_per_direction": 1
+      }
+    }
+  },
+  "player_compatibility": {
+    "cell_size": [
+      64,
+      64
+    ],
+    "native_offset": [
+      16,
+      20
+    ],
+    "pivot": [
+      32,
+      48
+    ],
+    "walk_columns": 6,
+    "attack_columns": 8
+  }
+}

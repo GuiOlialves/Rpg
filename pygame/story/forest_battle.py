@@ -4,6 +4,7 @@ import pygame
 from entities.enemy import Enemy
 from story.arrival_scene import ScriptedDialogue, Silhouette
 from story.sequence import Beat, NarrativeSequence
+from ui.character_art import draw_character
 
 
 AMBUSH_LINES = (
@@ -35,6 +36,7 @@ class RedContact:
         self.actor = actor
         self.group_index = group_index
         self.visible = True
+        self.fallen_image = None
 
     @property
     def depth(self):
@@ -43,6 +45,13 @@ class RedContact:
     def draw(self, canvas, camera, player=None):
         if self.visible:
             self.actor.draw(canvas, camera)
+
+    def draw_fallen(self, canvas, camera):
+        # Decoration derived from already-recorded casualties, never a new enemy.
+        if self.fallen_image is None:
+            self.fallen_image = self.actor.death_sheet
+        draw_character(canvas, camera, self.fallen_image, self.actor.x, self.actor.y,
+                       facing=1 if self.actor.facing < 0 else 2)
 
 
 def prepare_red_contacts(groups, load):
@@ -96,6 +105,9 @@ class RedAmbushScene:
         self.player.walk_frame = 0
         self.player.invulnerability_timer = 0
         self.player.attack_timer = self.player.dash_timer = self.player.dash_iframes = 0
+        for actor in self.actors:
+            actor.facing = -1 if self.player.x < actor.x else 1
+        self.player.facing = 2 if self.actors[0].x > self.player.x else 1
         self.dialogue.open(self.dialogue_actor)
 
     @property
