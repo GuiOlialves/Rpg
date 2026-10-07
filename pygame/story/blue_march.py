@@ -1,7 +1,7 @@
 """One-time blue-army march through the village after the house investigation."""
 from entities.npc import NPC
 from story.arrival_scene import ScriptedDialogue
-from ui.character_art import character_sheet, draw_character, fallen_image
+from ui.character_art import character_sheet, fallen_image, DRAW_SIZE
 
 
 COMMANDER_LINES = (
@@ -24,8 +24,8 @@ COMMANDER_LINES = (
 
 
 BLUE_FRAME = 32
-BLUE_SIZES = (48, 48, 48, 48)
-COMMANDER_FALLEN_SIZE = 48
+BLUE_SIZES = (DRAW_SIZE,) * 4
+COMMANDER_FALLEN_SIZE = DRAW_SIZE
 
 
 def blue_troop_sprite(load, variant=0, animation="Idle"):
@@ -48,10 +48,7 @@ def blue_fallen_sprite(sheet, draw_size=COMMANDER_FALLEN_SIZE, angle=-76):
 class BlueTrooper(NPC):
     """Stable foot pivot and facing across the military idle/run animations."""
     def draw(self, canvas, camera):
-        sheet = self.run_sprite if self.running else self.sprite
-        index = (self.anim_tick // 8) % (sheet.get_width() // BLUE_FRAME) if self.running else 0
-        draw_character(canvas, camera, sheet, self.x, self.y, index,
-                       self.facing, self.draw_size)
+        super().draw(canvas,camera)
 
 
 class BlueMarchScene:

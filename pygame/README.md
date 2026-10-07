@@ -8,18 +8,14 @@ O jogo reúne exploração, combate e progressão em três áreas conectadas: Vi
 
 ### Estado atual
 
-O Prólogo — O Nome que Falta está completo até o encerramento. Vila, Casa, Floresta e Deserto, combate, boss do Oficial Vermelho, cutscenes, Save/Load, debug, checkpoints narrativos, inventário e progressão já estão presentes. O projeto está temporariamente pausado/arquivado; não implementar o Capítulo 1 ainda.
+O Prólogo — O Nome que Falta está completo até o encerramento. Vila, Casa, Floresta e Deserto, combate, boss do Oficial Vermelho, cutscenes, Save/Load, debug, checkpoints narrativos, inventário e progressão já estão presentes. O Capítulo 1 está implementado até o bloco 1D: retorno ao Vale, antiga estrada, Posto de Vigia e encontro com Edrin. Veja o [bloco 1D e suas flags](CHAPTER_1D.md).
 
-O protagonista e suas animações atuais ainda não representam a qualidade visual desejada.
+O pacote de personagens foi refinado em etapas: rosto e base do protagonista, idle/passos, espada curta e poses de ataque, dash e, depois, os demais atores. A espada mantém tamanho e empunhadura; sua máscara acompanha o alcance visual. O dash tem impulso e retorno de postura, com rastro breve, preservando seus parâmetros de gameplay. Civis, tropas, Oficial Vermelho e inimigos usam a mesma grade/paleta, com rostos legíveis e silhuetas próprias. Veja o [contrato visual e os previews](assets/vale_characters/README.md).
 
 ### Próximos passos
 
-1. Melhorar as animações do protagonista.
-2. Recuperar ou refazer a animação de ataque de espada.
-3. Finalizar a integração e o refino do novo estilo de sprites.
-4. Fazer a revisão visual final do prólogo.
-5. Testar o prólogo completo como jogador, sem debug.
-6. Somente depois iniciar o Capítulo 1.
+1. Jogar o encontro com Edrin a partir da saída do Posto de Vigia.
+2. O destino da Ponte de Namar fica para o próximo bloco, ainda não implementado.
 
 ## Executar
 

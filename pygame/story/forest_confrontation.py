@@ -5,7 +5,8 @@ from entities.npc import NPC
 from story.arrival_scene import ScriptedDialogue
 from story.sequence import Beat, NarrativeSequence
 from story.blue_march import blue_fallen_sprite
-from ui.character_art import character_sheet, draw_character
+from ui.character_art import character_sheet, character_visual
+from core.animation import IDLE_DURATIONS, timed_frame
 
 
 REVELATION_LINES = (
@@ -118,16 +119,19 @@ class _RedOfficer(NPC):
         return self.y
 
     def draw(self, canvas, camera, player=None):
-        sheet = self.run_sprite if self.running and self.run_sprite else self.sprite
-        frame_count = max(1, sheet.get_width() // self.frame_size)
-        frame_index = (self.anim_tick // 5) % frame_count if self.running else 0
+        if (not getattr(self,'guarded',False)
+                and (getattr(self,'state',None) != 'DEFEATED' or getattr(self,'standing_up',False))):
+            super().draw(canvas,camera)
+            return
+        state = 'walk' if self.running else 'idle'
+        frame_index = (self.anim_tick//5)%8 if self.running else timed_frame(pygame.time.get_ticks()*60//1000,IDLE_DURATIONS)
+        weapon_index = None
         if getattr(self, "guarded", False):
-            sheet = self.guard_sprite
-            frame_index = 1
+            state, frame_index, weapon_index = 'windup', 1, 1
         if getattr(self, "state", None) == "DEFEATED" and not getattr(self, "standing_up", False):
-            sheet, frame_index = self.defeated_sprite, 0
-        draw_character(canvas, camera, sheet, self.x, self.y, frame_index,
-                       self.facing, self.draw_size)
+            state, frame_index, weapon_index = 'defeated', 0, None
+        self.visual.draw(canvas,camera,self.x,self.y,state,self.facing,frame_index,weapon_index=weapon_index)
+        self.last_visual_position = (self.x,self.y)
 
 
 def create_waiting_officer(load, position):
@@ -137,6 +141,7 @@ def create_waiting_officer(load, position):
                         frame_size=32, draw_size=48)
     actor.guard_sprite = character_sheet(load, "red_officer", "windup")
     actor.defeated_sprite = character_sheet(load, "red_officer", "defeated")
+    actor.visual = character_visual(load,'red_officer',('idle','walk','windup','defeated'),weapon=True)
     actor.guarded = False
     actor.facing = 2
     return actor

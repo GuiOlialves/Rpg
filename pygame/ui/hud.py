@@ -113,7 +113,7 @@ def _wrap_words(text, font, width, max_lines=2):
     return lines
 
 
-def draw_objective_tracker(surface, text, font):
+def draw_objective_tracker(surface, text, font, title="OBJETIVO ATUAL"):
     """Present the current objective as a compact, labeled HUD card."""
     small = pygame.font.Font(None, 17)
     body = pygame.font.Font(None, max(18, font.get_height() - 2))
@@ -124,8 +124,8 @@ def draw_objective_tracker(surface, text, font):
     panel = pygame.Rect(surface.get_width() - panel_width - 16, 52,
                         panel_width, panel_height)
     draw_panel(surface, panel, fill=(25, 34, 40), radius=6, shadow=True)
-    title = small.render("OBJETIVO ATUAL", True, ACCENT)
-    surface.blit(title, (panel.x + 12, panel.y + 7))
+    title_image = small.render(title.upper(), True, ACCENT)
+    surface.blit(title_image, (panel.x + 12, panel.y + 7))
     for index, line in enumerate(lines):
         text_image = body.render(line, True, TEXT)
         surface.blit(text_image, (panel.x + 12,

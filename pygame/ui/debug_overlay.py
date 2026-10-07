@@ -9,6 +9,14 @@ def _active(scene):
 
 
 def narrative_stage(region_id, story, quest):
+    if story.get("pursuit_entered"):
+        return "Capítulo 1D — O Homem que Deveria Estar Morto"
+    if story.get("watchpost_entered"):
+        return "Capítulo 1C — O Posto de Vigia"
+    if story.get("old_road_entered"):
+        return "Capítulo 1B — A Antiga Estrada"
+    if story.get("chapter1_started"):
+        return "Capítulo 1A — O Retorno"
     if not story.get("woke_up"):
         return "Prólogo 1 — Abertura"
     if story.get("red_officer_met"):
@@ -35,17 +43,23 @@ def narrative_stage(region_id, story, quest):
 
 def _scene_status(*, narrative, arrival_scene, alden_scene, house_memory_scene,
                   blue_march_scene, forest_ambush_scene, insignia_memory_scene,
-                  red_officer_scene, transition_active):
+                  red_officer_scene, transition_active, prologue_3c_scene=None,
+                  chapter1_return_scene=None, old_road_scene=None, watchpost_scene=None, edrin_scene=None):
     if narrative is not None and narrative.active:
         return f"opening_sequence {narrative.index + 1}/{len(narrative.beats)}", True
     scene_rows = (
         (arrival_scene, lambda: f"arrival_scene:{arrival_scene.phase}"),
-        (alden_scene, lambda: f"alden_post_slimes:{alden_scene.index + 1}/{len(alden_scene.STEPS)}"),
+        (alden_scene, lambda: f"{getattr(alden_scene, 'debug_label', 'alden_post_slimes')}:{alden_scene.index + 1}/{len(alden_scene.STEPS)}"),
         (house_memory_scene, lambda: f"house_memory:{house_memory_scene.kind}:{house_memory_scene.index + 1}/{len(house_memory_scene.steps)}"),
         (blue_march_scene, lambda: f"blue_march:{blue_march_scene.phase}"),
         (forest_ambush_scene, lambda: "red_ambush"),
         (insignia_memory_scene, lambda: f"insignia_memory:{insignia_memory_scene.index + 1}/{len(insignia_memory_scene.steps)}"),
         (red_officer_scene, lambda: f"red_officer:{red_officer_scene.phase}"),
+        (prologue_3c_scene, lambda: f"prologue_3c:{prologue_3c_scene.phase}"),
+        (chapter1_return_scene, lambda: f"chapter1_return:{chapter1_return_scene.phase}"),
+        (old_road_scene, lambda: f"old_road:{old_road_scene.kind}"),
+        (watchpost_scene, lambda: f"watchpost:{watchpost_scene.kind}"),
+        (edrin_scene, lambda: f"edrin:{edrin_scene.phase}"),
     )
     for scene, label in scene_rows:
         if _active(scene):
@@ -100,7 +114,20 @@ def _entity_counts(region, enemies, *, blue_march_scene, forest_ambush_scene,
 
 
 def _story_flags(region_id, story):
-    if region_id == "forest":
+    if story.get('pursuit_entered'):
+        names = ('edrin_met', 'edrin_name_known', 'edrin_death_revealed', 'edrin_authority_revealed',
+                 'edrin_forgetting_revealed', 'edrin_encounter_completed')
+        return [(name, str(story.get(name))) for name in names]
+    if story.get("watchpost_entered"):
+        names = ("watchpost_entry_open","watchpost_roster_read","watchpost_personal_item_found",
+                 "watchpost_flashback_seen","watchpost_blue_order_found","watchpost_trail_found")
+    elif story.get("old_road_entered"):
+        names = ("old_road_entered","road_red_clue_found","road_blue_trace_found",
+                 "road_memory_seen","road_camp_found","watchpost_seen")
+    elif story.get("chapter1_started"):
+        names = ("prologue_completed", "chapter1_started", "chapter1_returned",
+                 "chapter1_alden_talk", "old_road_unlocked")
+    elif region_id == "forest":
         names = ("blue_army_departed", "forest_massacre_discovered",
                  "forest_battle_progress", "red_insignia_found", "red_officer_met")
     elif story.get("house_investigation_unlocked"):

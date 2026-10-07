@@ -3,6 +3,7 @@ import math
 import pygame
 from entities.enemy import Enemy
 from ui.character_art import draw_character
+from core.animation import cardinal
 
 
 class RedOfficer(Enemy):
@@ -43,6 +44,7 @@ class RedOfficer(Enemy):
         if self.state == "DEFEATED" or self.hit_resistance_timer > 0:
             return False
         self.hp = max(self.defeat_hp, self.hp - damage)
+        self.visual_flash = 8
         self.hit_resistance_timer = 7
         # A committed attack can take damage but cannot be stun-locked.
         # Recovery remains stationary and fully punishable.
@@ -58,6 +60,7 @@ class RedOfficer(Enemy):
         self.attack_action = action
         self.attack_phase = "windup"
         self.attack_direction = self._direction_to(player)
+        self.visual_facing = cardinal(*self.attack_direction)
         self.facing = -1 if self.attack_direction[0] < 0 else 1
         self.phase_timer = self.tuning[{"normal": "quick", "charged": "heavy", "charge": "lunge"}[action]]
         self.attack_hit = False
@@ -84,6 +87,8 @@ class RedOfficer(Enemy):
         if self.state == "DEFEATED" or not self.hostile:
             return True
         self.anim_tick += 1
+        self.visual_moving = False
+        self.visual_flash = max(0,self.visual_flash-1)
         self.hit_resistance_timer = max(0, self.hit_resistance_timer - 1)
         if self.state == "ATTACK":
             self.phase_timer -= 1
@@ -156,6 +161,6 @@ class RedOfficer(Enemy):
     def draw(self, canvas, camera, player=None):
         if self.state == "DEFEATED":
             draw_character(canvas, camera, self.defeated_sheet, self.x, self.y,
-                           facing=1 if self.facing < 0 else 2)
+                           facing=self.visual_facing)
         else:
             super().draw(canvas, camera)

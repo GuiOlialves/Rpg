@@ -3,7 +3,7 @@ import pygame
 from core.config import RESPAWN_IFRAMES
 
 def safe_respawn_position(region_id, region, enemies):
-    source = {"forest": "village", "desert": "forest"}.get(region_id)
+    source = {"forest": "village", "desert": "forest", "old_road": "village", "watchpost":"old_road", "pursuit":"watchpost"}.get(region_id)
     default = (512, 288) if region_id == "home" else (1024, 576)
     preferred = region.get("spawn", {}).get(source, default) if source else default
     candidates = [preferred]
@@ -27,10 +27,16 @@ def restore_player_after_death(player, region_id, region, enemies):
     player.hp, player.sp = player.max_hp, player.max_sp
     player.attack_timer = player.attack_cooldown_timer = 0
     player.dash_timer = player.dash_cooldown = player.dash_iframes = 0
+    player.dash_recovery_timer = 0
     player.invulnerability_timer = RESPAWN_IFRAMES
     player.knockback_x = player.knockback_y = 0.0
     player.knockback_frames = 0
     player.dash_feedback_timer = 0
     player.dash_feedback_kind = ""
     player.attack_serial += 1
+    player.hurt_visual_timer = player.impact_timer = player.dust_timer = 0
+    player.death_started = None
+    player.moving = False
+    player.walk_frame = 0
+    player.dash_trail.clear()
     return player.x, player.y

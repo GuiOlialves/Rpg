@@ -4,7 +4,9 @@ import math
 import random
 import pygame
 from systems.items import consumable
-from ui.character_art import character_sheet, PIVOT
+from ui.character_art import (character_sheet, PIVOT, character_visual, prepared_frames,
+                              flash_image, alpha_image)
+from core.animation import IDLE_DURATIONS, WALK_STRIDE_PIXELS, timed_frame, cardinal
 
 ENEMY_CONFIGS = {
     "slime": {
@@ -36,7 +38,7 @@ ENEMY_CONFIGS = {
     },
     "red_officer": {
         "name": "OFICIAL VERMELHO", "faction": "red", "scripted_encounter": True,
-        "max_hp": 600, "damage": 20, "speed": 3.25,
+        "max_hp": 400, "damage": 16, "speed": 3.25,
         "perception": 700, "attack_range": 88, "cooldown": 12,
         "frame_size": 32, "scale": 1.5, "hitbox_radius": 20,
         "idle_frames": 1, "move_frames": 4, "attack_frames": 3,
@@ -70,6 +72,14 @@ ENEMY_CONFIGS = {
         "drop": {"id": "ether", "chance": 0.38, "min": 1, "max": 1}, "xp_reward": 78,
     },
 }
+
+# Presentation contracts only. AI, HP, reach, drops and collision radii stay above.
+for _kind, _config in ENEMY_CONFIGS.items():
+    if _kind == 'slime':
+        _config['scale'] = 2
+    else:
+        _config.update(frame_size=32, scale=2, idle_frames=4, move_frames=8,
+                       attack_frames=8, hurt_frames=3, death_frames=4)
 
 
 @dataclass
@@ -132,6 +142,10 @@ class Enemy:
         # Leve defasagem inicial evita que grupos comecem o primeiro golpe juntos.
         self.attack_cooldown = self.rng.randrange(0, 24)
         self.visual_variant = (seed + seed // 3) % 3
+        self.visual_facing = 0
+        self.visual_distance = 0.0
+        self.visual_moving = False
+        self.visual_flash = 0
         self.idle_sheet = load(self._path("Idle"))
         self.move_sheet = load(self._path("Run"))
         self.attack_sheet = load(self._path("Attack"))
@@ -140,20 +154,29 @@ class Enemy:
         size=self.config['frame_size']
         # Pivô constante: não reposicionar cada frame pelo bounding box variável.
         self.visual_foot=self.idle_sheet.subsurface((0,0,size,size)).get_bounding_rect().bottom
-        if self.kind in {"red_soldier", "red_officer"}:
-            character = (f"red_soldier_{self.visual_variant}" if self.kind == "red_soldier"
-                         else "red_officer")
+        if self.kind != 'slime':
+            character = self.character_look
             self.hurt_sheet = character_sheet(load, character, "hurt")
-            self.death_sheet = character_sheet(load, character, "fallen")
+            self.death_sheet = character_sheet(load, character, "death")
             self.windup_sheet = character_sheet(load, character, "windup")
             self.visual_foot = PIVOT[1]
+            states = ('idle','walk','attack','windup','hurt','death')
             if self.kind == "red_officer":
                 self.defeated_sheet = character_sheet(load, character, "defeated")
+                states += ('defeated',)
+            self.visual = character_visual(load,character,states,weapon=self.kind != 'desert_scout')
+        else:
+            self.visual = None
+            self.slime_frames = prepared_frames(self.idle_sheet,64)
+            self.slime_flashes = tuple(tuple(flash_image(im) for im in row) for row in self.slime_frames)
+
+    @property
+    def character_look(self):
+        return f'red_soldier_{self.visual_variant}' if self.kind == 'red_soldier' else self.kind
 
     def _path(self, animation):
-        if self.kind in {"red_soldier", "red_officer"}:
-            character = (f"red_soldier_{self.visual_variant}" if self.kind == "red_soldier"
-                         else "red_officer")
+        if self.kind != 'slime':
+            character = self.character_look
             action = {"Idle": "idle", "Run": "walk", "Attack": "attack"}[animation]
             return f"assets/vale_characters/{character}_{action}.png"
         if self.kind == "slime":
@@ -187,6 +210,10 @@ class Enemy:
         if outside or any(box.colliderect(rect) for rect in obstacles):
             self.x -= dx; self.y -= dy
             return False
+        if self.state in {'WANDER','CHASE'} and abs(dx)+abs(dy) > .01:
+            self.visual_moving = True
+            self.visual_distance = (self.visual_distance+math.hypot(dx,dy)) % WALK_STRIDE_PIXELS
+            self.visual_facing = cardinal(dx,dy)
         return True
 
     def _choose_wander(self):
@@ -218,6 +245,7 @@ class Enemy:
         self.last_action = action
         self.attack_phase = "windup"
         self.attack_direction = self._direction_to(player)
+        self.visual_facing = cardinal(*self.attack_direction)
         self.facing = -1 if self.attack_direction[0] < 0 else 1
         self.attack_hit = False
         self.hit_confirmed = False
@@ -303,6 +331,8 @@ class Enemy:
 
     def update(self, player, obstacles):
         self.anim_tick += 1
+        self.visual_moving = False
+        self.visual_flash = max(0,self.visual_flash-1)
         if self.hit_resistance_timer > 0:
             self.hit_resistance_timer -= 1
         if self.state == "DEAD":
@@ -325,6 +355,7 @@ class Enemy:
             return True
         if distance_player <= self.config["perception"] and distance_home <= 360:
             if self.kind == "desert_scout" and distance_player < 105 and self.attack_cooldown > 0:
+                self.state = 'CHASE'
                 angle = math.atan2(self.y - player.y, self.x - player.x)
                 self._move(math.cos(angle) * self.speed, math.sin(angle) * self.speed, obstacles)
                 self.facing = -1 if player.x < self.x else 1
@@ -360,6 +391,8 @@ class Enemy:
     def receive_hit(self, damage, from_x, from_y, knockback=1.0):
         if self.state == "DEAD" or self.hurt_timer > 0 or self.hit_resistance_timer > 0: return False
         self.hp = max(0, self.hp - damage)
+        self.visual_flash = 8
+        self.anim_tick = 0
         angle = math.atan2(self.y - from_y, self.x - from_x)
         special = self.kind == "forest_guardian" and self.state == "ATTACK"
         force = (0.45 if special else 0.75 if self.kind == "forest_guardian"
@@ -390,42 +423,53 @@ class Enemy:
         return Drop(item, self.x, self.y)
 
     def draw(self, canvas, camera):
-        cfg = self.config
-        if self.state == "DEAD":
-            sheet, row, count = self.death_sheet, 12 if self.kind == "slime" else 0, cfg["death_frames"]
-        elif self.state == "ATTACK": sheet, row, count = self.attack_sheet, 6 if self.kind == "slime" else 0, cfg["attack_frames"]
-        elif self.state == "WANDER" or self.state == "CHASE": sheet, row, count = self.move_sheet, 3 if self.kind == "slime" else 0, cfg["move_frames"]
-        elif self.state == "HURT": sheet, row, count = self.hurt_sheet, 9 if self.kind == "slime" else 0, cfg["hurt_frames"]
-        else: sheet, row, count = self.idle_sheet, 0, cfg["idle_frames"]
-        # Cada inimigo possui seu próprio relógio de animação. Usar o relógio
-        # global fazia os frames reiniciarem de forma irregular durante HURT.
-        index = (self.anim_tick // 8) % max(1, count)
-        own_art = self.kind in {"red_soldier", "red_officer"}
-        if own_art:
-            row = 1 if self.facing < 0 else 2
-            if self.state == "ATTACK":
-                if self.attack_phase == "windup":
-                    sheet = self.windup_sheet
-                    index = (self.anim_tick // 8) % (sheet.get_width() // 32)
-                elif self.attack_phase == "active":
-                    index = 1 if self.phase_timer > 2 else 2
-                elif self.attack_phase == "recovery":
-                    sheet, index = self.idle_sheet, 0
-            elif self.kind == "red_officer" and self.hit_resistance_timer > 0:
-                # A visual hit reaction must not interrupt the duelist's AI.
-                sheet, index = self.hurt_sheet, 0
-        size = cfg["frame_size"]
-        rect = pygame.Rect(index * size, row * size, size, size)
-        if self.kind == "warrior": rect = pygame.Rect(index * size, 0, size, size)
-        image = sheet.subsurface(rect).copy()
-        if self.facing < 0 and not own_art: image = pygame.transform.flip(image, True, False)
-        scale = cfg["scale"]
-        image = pygame.transform.scale(image, (round(image.width * scale), round(image.height * scale)))
-        draw_x = round(self.x - image.width / 2 - camera[0])
-        draw_y = round(self.y - self.visual_foot * scale - camera[1])
+        state, index, weapon_index = 'idle', timed_frame(self.anim_tick,IDLE_DURATIONS), None
+        facing = self.visual_facing
+        if self.state == 'DEAD': state, index = 'death', min(3,(36-self.dead_timer)//7)
+        elif self.state == 'HURT': state, index = 'hurt', min(2,self.anim_tick//3)
+        elif self.state in {'CHASE','WANDER'} and self.visual_moving:
+            state, index = 'walk', int(self.visual_distance/WALK_STRIDE_PIXELS*8)%8
+        elif self.state == 'ATTACK':
+            facing = cardinal(*self.attack_direction)
+            if self.attack_phase == 'windup':
+                state, index = 'windup', min(1,self.anim_tick//7)
+                weapon_index = index
+            elif self.attack_phase == 'active':
+                duration = 12 if self.attack_action == 'charge' else 5 if self.attack_action == 'aoe' or self.kind == 'red_officer' else 4
+                state, index = 'attack', min(5,2+int((duration-self.phase_timer)*4/max(1,duration)))
+                weapon_index = 3 if self.attack_action == 'charge' else index
+            else:
+                state, index = 'attack', 6 if self.phase_timer > 6 else 7
+                weapon_index = index
+        if self.visual:
+            image = self.visual.image(state,facing,index,flash=self.visual_flash > 4)
+        else:
+            row,count = {'idle':(0,4),'walk':(3,6),'attack':(6,7),'windup':(6,7),
+                         'hurt':(9,3),'death':(12,5)}[state]
+            index = min(4,(36-self.dead_timer)//6) if state == 'death' else min(2,self.anim_tick//3) if state == 'hurt' else (self.anim_tick//8)%count
+            image = (self.slime_flashes if self.visual_flash > 4 else self.slime_frames)[row][index]
+        draw_x = round(self.x-image.width/2-camera[0])
+        draw_y = round(self.y-self.visual_foot*2-camera[1])
         if self.state == "DEAD" and self.dead_timer < 8:
-            image.set_alpha(max(0, self.dead_timer * 32))
+            image = alpha_image(image,max(0,self.dead_timer*32))
         canvas.blit(image, (draw_x, draw_y))
+        if weapon_index is not None and self.visual and self.visual.weapons:
+            if self.attack_action == 'charged' and self.visual.heavy_weapons:
+                canvas.blit(self.visual.heavy_weapons[facing][weapon_index],
+                            self.visual.heavy_weapon_origin(self.x,self.y,camera))
+            else:
+                canvas.blit(self.visual.weapons[facing][weapon_index],
+                            self.visual.weapon_origin(self.x,self.y,camera))
+        if self.state == 'ATTACK' and self.attack_phase == 'active':
+            if self.attack_action == 'ranged' and self.telegraph_target:
+                progress = min(1,(4-self.phase_timer)/3)
+                ax = self.x+(self.telegraph_target[0]-self.x)*progress-camera[0]
+                ay = self.y-22+(self.telegraph_target[1]-self.y+22)*progress-camera[1]
+                dx,dy = self.attack_direction
+                pygame.draw.line(canvas,(237,215,158),(round(ax-dx*10),round(ay-dy*10)),(round(ax),round(ay)),2)
+            elif self.attack_action == 'aoe':
+                center=(round(self.x-camera[0]),round(self.y-camera[1]))
+                pygame.draw.circle(canvas,(225,192,115),center,65,2)
         if self.state == "ATTACK" and self.attack_phase == "windup":
             center = (round(self.x - camera[0]), round(self.y - camera[1]))
             if self.attack_action == "aoe":
@@ -447,8 +491,3 @@ class Enemy:
                                  warning, 3 if self.attack_action == "charged" else 2)
                 if self.attack_action == "charged":
                     pygame.draw.circle(canvas, (255, 212, 126), center, 38, 2)
-        if self.state == "HURT":
-            flash=image.copy()
-            flash.fill((90,25,12,0),special_flags=pygame.BLEND_RGBA_ADD)
-            flash.set_alpha(90)
-            canvas.blit(flash,(draw_x,draw_y))

@@ -6,6 +6,15 @@ CONSUMABLES = {
     "herb": {"name": "Erva", "color": (84, 177, 113), "resource": "hp", "restore": 15},
 }
 
+QUEST_ITEMS = {
+    "escort_token": {"name": "Identificação R-17", "color": (172,143,85),
+                     "description": "Peça pessoal gasta, marcada R-17. Reconhecida no alojamento do Posto Norte."},
+}
+
+
+def quest_item(item_id):
+    return {"id":item_id, "amount":1, "type":"quest", **QUEST_ITEMS[item_id]}
+
 
 def consumable(item_id, amount=1):
     definition = CONSUMABLES[item_id]

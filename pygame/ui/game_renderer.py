@@ -33,14 +33,36 @@ class GameRenderer:
              alden_scene=None, house_memory_scene=None, blue_march_scene=None,
              forest_ambush_scene=None, insignia_memory_scene=None,
              red_officer_scene=None, prologue_3c_scene=None,
+             chapter1_return_scene=None,
+             old_road_scene=None,
+             watchpost_scene=None, edrin_scene=None,
              story=None, prologue_end_card=False):
+        if chapter1_return_scene is not None and chapter1_return_scene.active:
+            if chapter1_return_scene.phase != "return":
+                chapter1_return_scene.draw_title(canvas)
+            else:
+                draw_world(canvas, region, font, camera, player, [], [],
+                           show_controls=False, show_banner=False, story_context=story)
+                draw_letterbox(canvas)
+                chapter1_return_scene.fade.draw(canvas)
+            return
+        if getattr(self,'impact_serial',0) != player.impact_serial:
+            self.impact_serial = player.impact_serial
+            self.shake_tick = 4
+        if getattr(self,'shake_tick',0) and ui_mode is None and not dialogue.active:
+            offset = ((0,0),(-1,0),(1,-1),(-1,1),(1,0))[self.shake_tick]
+            camera = (camera[0]+offset[0]*player.impact_strength,
+                      camera[1]+offset[1]*player.impact_strength)
+            self.shake_tick -= 1
         # Framing is presentation-only: no actor, collision or gameplay camera is moved.
         shot_scene = next((scene for scene in (
-            prologue_3c_scene, red_officer_scene, blue_march_scene,
+            edrin_scene, watchpost_scene, old_road_scene, prologue_3c_scene, red_officer_scene, blue_march_scene,
             forest_ambush_scene, insignia_memory_scene, alden_scene)
             if scene is not None and scene.active), None)
         memory = (prologue_3c_scene is not None and prologue_3c_scene.active
                   and prologue_3c_scene.memory_visible)
+        post_memory = bool(watchpost_scene is not None and watchpost_scene.memory_visible)
+        memory = memory or post_memory
 
         def render_world(show_controls=True, scene_actors=(), include_player=True):
             world_player = player if include_player else None
@@ -70,6 +92,12 @@ class GameRenderer:
                 if shot_scene is alden_scene and alden_scene is not None:
                     focus_x = (player.x + alden_scene.alden.x) / 2
                     focus_y = (player.y + alden_scene.alden.y) / 2
+                elif shot_scene is edrin_scene and edrin_scene is not None:
+                    focus_x,focus_y = edrin_scene.focus
+                elif shot_scene is old_road_scene and old_road_scene is not None:
+                    focus_x,focus_y = old_road_scene.focus
+                elif shot_scene is watchpost_scene and watchpost_scene is not None:
+                    focus_x,focus_y = watchpost_scene.focus
                 elif shot_scene is blue_march_scene and blue_march_scene is not None:
                     focus_x, focus_y = player.x - 85, player.y + 30
                 elif shot_scene is forest_ambush_scene and forest_ambush_scene is not None:
@@ -102,7 +130,10 @@ class GameRenderer:
                 backdrop = region
                 if memory:
                     # Keep the existing landscape, omitting present-day bodies and props.
-                    backdrop = dict(region, objects=[], scenery=[], npcs=[], interactables=[])
+                    backdrop = dict(region, objects=[],
+                                    terrain=region.get("memory_terrain",region["terrain"]) if post_memory else region["terrain"],
+                                    scenery=region.get("memory_scenery",region["scenery"]) if post_memory else [],
+                                    npcs=[], interactables=[])
                     world_player = None
                 draw_world(self.shot_canvas, backdrop, font, shot_camera,
                            world_player, [] if memory else enemies, [] if memory else drops,
@@ -123,6 +154,28 @@ class GameRenderer:
             draw_narrative(
                 canvas, narrative,
                 world_renderer=lambda: render_world(show_controls=False))
+            return
+        if edrin_scene is not None and edrin_scene.active:
+            render_encounter = lambda: render_world(show_controls=False,scene_actors=edrin_scene.world_actors)
+            if edrin_scene.sequence is not None:
+                draw_narrative(canvas,edrin_scene.sequence,world_renderer=render_encounter)
+            else:
+                render_encounter()
+                draw_letterbox(canvas)
+                dialogue.draw(canvas,font,title_font)
+            return
+        if old_road_scene is not None and old_road_scene.active:
+            def render_road_moment():
+                render_world(show_controls=False,scene_actors=old_road_scene.world_actors)
+                old_road_scene.draw_overlay(canvas)
+            draw_narrative(canvas,old_road_scene.sequence,world_renderer=render_road_moment)
+            return
+        if watchpost_scene is not None and watchpost_scene.active:
+            def render_post_moment():
+                render_world(show_controls=False,scene_actors=watchpost_scene.world_actors,
+                             include_player=not watchpost_scene.memory_visible)
+                watchpost_scene.draw_overlay(canvas)
+            draw_narrative(canvas,watchpost_scene.sequence,world_renderer=render_post_moment)
             return
         alden_active = alden_scene is not None and alden_scene.active
         if alden_active and alden_scene.sequence is not None:
@@ -211,7 +264,8 @@ class GameRenderer:
         dialogue.draw(canvas, font, title_font)
         quest_text = (story.objective_text if story is not None else "") or quest_manager.active_text()
         if quest_text and not cinematic and not dialogue.active and ui_mode is None:
-            draw_objective_tracker(canvas, quest_text, font)
+            draw_objective_tracker(canvas, quest_text, font,
+                                   title=story.objective_title if story is not None else "OBJETIVO ATUAL")
         if (quest_manager.notice_timer and not cinematic and not dialogue.active
                 and ui_mode is None):
             draw_notice(canvas, quest_manager.notice, font)

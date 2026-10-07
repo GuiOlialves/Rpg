@@ -40,7 +40,14 @@ def draw_item_icon(canvas, item, center, size=34):
     pygame.draw.rect(canvas, (76, 91, 92), plate, 1, border_radius=5)
     item_id = item.get("id", "")
     kind = inventory_kind(item)
-    if kind == "consumable" and item_id in {"potion", "ether"}:
+    if item_id == "escort_token":
+        tag = pygame.Rect(center[0]-10,center[1]-9,20,22)
+        pygame.draw.rect(canvas,(47,42,33),tag.inflate(4,4))
+        pygame.draw.rect(canvas,color,tag)
+        pygame.draw.line(canvas,(223,191,117),tag.topleft,tag.topright,2)
+        pygame.draw.line(canvas,(79,67,46),(tag.x+4,tag.y+8),(tag.right-4,tag.y+8),2)
+        pygame.draw.circle(canvas,(52,49,40),(center[0],tag.y+3),2)
+    elif kind == "consumable" and item_id in {"potion", "ether"}:
         body = pygame.Rect(center[0] - 7, center[1] - 7, 14, 17)
         neck = pygame.Rect(center[0] - 4, center[1] - 13, 8, 7)
         pygame.draw.rect(canvas, (36, 35, 31), body.inflate(4, 4), border_radius=3)
@@ -151,7 +158,7 @@ def draw_inventory(canvas, inventory, font, title_font, player, ui_state, mouse_
             canvas.blit(title_font.render(line, True, ACCENT),
                         (details.x + 90, details.y + 20 + i * 25))
         kind_y = details.y + 70 if len(name_lines) > 1 else details.y + 54
-        sub = f"Equipamento • {selected.get('slot', '')}" if kind == "equipment" else "Consumível" if kind == "consumable" else "Item"
+        sub = f"Equipamento • {selected.get('slot', '')}" if kind == "equipment" else "Consumível" if kind == "consumable" else "Item importante" if selected.get("type") == "quest" else "Item"
         canvas.blit(font.render(sub, True, (133, 192, 145)),
                     (details.x + 90, kind_y))
         pygame.draw.line(canvas, (69, 84, 85),

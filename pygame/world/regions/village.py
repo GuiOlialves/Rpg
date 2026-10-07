@@ -189,12 +189,18 @@ def build_playable(load):
         obstacles.append(npc.hitbox)
     npcs[0].quest_id = "forest_trouble"
     npcs[0].quest_effects_enabled = False
+    old_road_marker = Interactable(
+        "old_road_marker", "Antiga estrada", (108, 541), make_sign(),
+        ("A placa gasta aponta para uma rota atrás das colinas.",
+         "Os homens que Alden viu passaram por aqui. É o primeiro lugar onde procurar."),
+        prompt="[E] Examinar a antiga estrada", interaction_radius=72)
     return {
         "name": "Vila do Vale", "terrain": terrain(WORLD, asset), "houses": houses,
         "ambient_kind": "village", "objects": objects, "nature": nature,
         "fountain_effect": False,
         "obstacles": obstacles,
         "exits": {"forest": pygame.Rect(1960, 520, 88, 115)},
-        "spawn": {"forest": (1850, 575), "home": (540, 490)},
+        "spawn": {"forest": (1850, 575), "home": (540, 490), "old_road": (128,575)},
         "enemy_spawns": [], "npcs": npcs, "interactables": [entry],
+        "old_road_marker": old_road_marker,
     }

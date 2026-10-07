@@ -10,6 +10,12 @@ from core.config import (
 )
 from systems import progression as attributes
 from systems.equipment import SLOTS
+from core.assets import load
+from core.animation import (ATTACK_DURATIONS, ATTACK_ACTIVE_ELAPSED, IDLE_DURATIONS,
+                            HERO_WALK_STRIDE_PIXELS, HURT_FRAMES, DEATH_DURATIONS, timed_frame,
+                            DASH_POSE_DURATIONS, DASH_RECOVERY_DURATIONS,
+                            DASH_TRAIL_FRAMES, DASH_TRAIL_SPACING)
+from ui.character_art import character_visual, effect_frames, draw_effect, alpha_image
 
 
 def frame(sheet, index, direction):
@@ -33,6 +39,7 @@ class Player:
         self.modifiers = {}  # espaço para buffs e debuffs futuros
         self.invulnerability_timer = 0
         self.dash_timer = self.dash_cooldown = self.dash_iframes = 0
+        self.dash_recovery_timer = 0
         self.dash_dx = self.dash_dy = 0.0
         self.dash_trail = []
         self.dash_feedback_timer = 0
@@ -41,6 +48,18 @@ class Player:
         self.knockback_x = self.knockback_y = 0.0
         self.knockback_frames = 0
         self.attack_serial = 0
+        self.visual = character_visual(load, 'protagonist',
+            ('idle','walk','attack','dash','hurt','death'), weapon=True)
+        self.moving = False
+        self.walk_distance = 0.0
+        self.hurt_visual_timer = self.impact_timer = self.dust_timer = 0
+        self.impact_position = self.dust_position = (self.x, self.y)
+        self.impact_critical = False
+        self.impact_serial = self.impact_strength = 0
+        self.death_started = None
+        self.impact_fx = effect_frames(load, 'impact')
+        self.critical_fx = effect_frames(load, 'critical')
+        self.dust_fx = effect_frames(load, 'dust')
         self.recalculate_stats()
 
     def recalculate_stats(self):
@@ -96,6 +115,11 @@ class Player:
         return pygame.Rect(round(self.x - 13), round(self.y - 9), 26, 18)
 
     def update(self, keys, obstacles):
+        self.moving = False
+        self.hurt_visual_timer = max(0, self.hurt_visual_timer - 1)
+        self.impact_timer = max(0, self.impact_timer - 1)
+        self.dust_timer = max(0, self.dust_timer - 1)
+        self.dash_recovery_timer = max(0,self.dash_recovery_timer-1)
         if self.invulnerability_timer > 0:
             self.invulnerability_timer -= 1
         if self.attack_cooldown_timer > 0:
@@ -103,7 +127,7 @@ class Player:
         if self.dash_cooldown > 0: self.dash_cooldown -= 1
         if self.dash_iframes > 0: self.dash_iframes -= 1
         if self.dash_feedback_timer > 0: self.dash_feedback_timer -= 1
-        self.dash_trail = [(x, y, age - 1) for x, y, age in self.dash_trail if age > 1]
+        self.dash_trail = [(x,y,age-1,direction,index) for x,y,age,direction,index in self.dash_trail if age>1]
         self.sp_idle_frames += 1
         if self.sp_idle_frames >= SP_REGEN_DELAY and (self.sp_idle_frames - SP_REGEN_DELAY) % SP_REGEN_INTERVAL == 0:
             self.sp = min(self.max_sp, self.sp + 1)
@@ -120,7 +144,12 @@ class Player:
             if not horizontal_ok or not vertical_ok or (self.x, self.y) == old_position:
                 self.dash_timer = 0
                 self.dash_iframes = 0
-            else: self.dash_trail.append((*old_position, 7))
+            else:
+                if (DASH_FRAMES-self.dash_timer)%DASH_TRAIL_SPACING==0:
+                    index=timed_frame(max(0,DASH_FRAMES-self.dash_timer-1),DASH_POSE_DURATIONS,False)
+                    self.dash_trail.append((*old_position,DASH_TRAIL_FRAMES,self.facing,index))
+            if self.dash_timer==0:
+                self.dash_recovery_timer=sum(DASH_RECOVERY_DURATIONS)
             return
         if self.attack_timer > 0:
             self.attack_timer -= 1
@@ -132,12 +161,17 @@ class Player:
             return
         length = math.hypot(mx, my)
         dx, dy = mx / length * self.speed, my / length * self.speed
+        old_x, old_y = self.x, self.y
         self._move(dx, 0, obstacles); self._move(0, dy, obstacles)
         self._clamp_world()
         self.facing = 2 if abs(mx) > abs(my) and mx > 0 else 1 if abs(mx) > abs(my) else 0 if my > 0 else 3
-        self.walk_timer += 1
-        if self.walk_timer >= 8:
-            self.walk_timer = 0; self.walk_frame = (self.walk_frame + 1) % 6
+        distance = math.hypot(self.x-old_x, self.y-old_y)
+        self.moving = distance > .01
+        if self.moving:
+            self.walk_distance = (self.walk_distance + distance) % HERO_WALK_STRIDE_PIXELS
+            self.walk_frame = int(self.walk_distance / HERO_WALK_STRIDE_PIXELS * 8) % 8
+        else:
+            self.walk_frame = 0
 
     def _move(self, dx, dy, obstacles):
         self.x += dx; self.y += dy
@@ -173,6 +207,8 @@ class Player:
         self.sp -= DASH_SP_COST
         self.sp_idle_frames = 0
         self.dash_timer = DASH_FRAMES
+        self.dash_recovery_timer = 0
+        self.dust_position,self.dust_timer=(self.x,self.y),12
         # update() roda no mesmo frame do KEYDOWN; +1 preserva seis frames úteis.
         self.dash_iframes = DASH_IFRAMES + 1
         self.dash_cooldown = DASH_COOLDOWN_FRAMES
@@ -185,6 +221,7 @@ class Player:
             self.attack_cooldown_timer = self.attack_cooldown_frames
             self.attack_serial += 1
             self.attack_is_critical = random.random() < self.crit_chance
+            self.dash_recovery_timer = 0
             return True
         return False
 
@@ -198,13 +235,37 @@ class Player:
 
     @property
     def attack_box(self):
-        if not 3 <= self.attack_timer <= 12:
+        if not self.attack_active:
             return pygame.Rect(0, 0, 0, 0)
-        reach = 52
-        if self.facing == 1: return pygame.Rect(round(self.x - reach - 18), round(self.y - 35), reach, 52)
-        if self.facing == 2: return pygame.Rect(round(self.x + 18), round(self.y - 35), reach, 52)
-        if self.facing == 3: return pygame.Rect(round(self.x - 25), round(self.y - reach - 18), 50, reach)
-        return pygame.Rect(round(self.x - 25), round(self.y + 17), 50, reach)
+        return self.visual.hit_bounds[self.facing][self.attack_frame].move(
+            self.visual.weapon_origin(self.x,self.y))
+
+    @property
+    def attack_frame(self):
+        return timed_frame(attributes.ATTACK_ANIMATION_FRAMES-self.attack_timer,
+                           ATTACK_DURATIONS, loop=False)
+
+    @property
+    def attack_active(self):
+        elapsed = attributes.ATTACK_ANIMATION_FRAMES-self.attack_timer
+        return self.attack_timer > 0 and ATTACK_ACTIVE_ELAPSED[0] <= elapsed <= ATTACK_ACTIVE_ELAPSED[1]
+
+    def attack_hits(self, hurtbox):
+        """Test the authored sword sweep, excluding empty corners of its bounds."""
+        if not self.attack_box.colliderect(hurtbox):
+            return False
+        origin = self.visual.weapon_origin(self.x,self.y)
+        local = hurtbox.move(-origin[0], -origin[1])
+        mask = self.visual.hit_masks[self.facing][self.attack_frame]
+        return mask.overlap(pygame.mask.Mask(local.size, fill=True), local.topleft) is not None
+
+    def confirm_impact(self, x, y, critical=False, strong=False):
+        self.impact_position = (x, y-12)
+        self.impact_timer = 12
+        self.impact_critical = critical
+        if critical or strong:
+            self.impact_serial += 1
+            self.impact_strength = 2 if strong else 1
 
     def take_damage(self, amount, from_x=None, from_y=None, knockback=1.0):
         if self.invulnerability_timer > 0 or self.dash_iframes > 0 or self.hp <= 0:
@@ -212,6 +273,9 @@ class Player:
         reduced = attributes.physical_damage_after_defense(amount, self.defense)
         self.hp = max(0, self.hp - reduced)
         self.invulnerability_timer = PLAYER_HIT_IFRAMES
+        self.hurt_visual_timer = HURT_FRAMES
+        if self.hp <= 0:
+            self.death_started = pygame.time.get_ticks()
         if from_x is not None and from_y is not None:
             length = max(1.0, math.hypot(self.x - from_x, self.y - from_y))
             self.knockback_x = (self.x - from_x) / length * 3.8 * knockback
@@ -220,11 +284,42 @@ class Player:
         return True
 
     def draw(self, canvas, camera):
-        index = max(0, min(7, (16 - self.attack_timer) // 2)) if self.attack_timer else self.walk_frame
-        sprite = pygame.transform.scale(frame(self.attack_sheet if self.attack_timer else self.idle, index, self.facing), (96, 96))
-        for trail_x, trail_y, age in self.dash_trail[-4:]:
-            ghost = sprite.copy(); ghost.set_alpha(age * 20)
-            canvas.blit(ghost, (round(trail_x - 48 - camera[0]), round(trail_y - 72 - camera[1])))
-        if self.invulnerability_timer == 0 or (self.invulnerability_timer // 4) % 2 == 0:
-            if self.dash_timer > 0: sprite.set_alpha(195)
-            canvas.blit(sprite, (round(self.x - 48 - camera[0]), round(self.y - 72 - camera[1])))
+        state, index = 'idle', timed_frame(pygame.time.get_ticks()*60//1000, IDLE_DURATIONS)
+        weapon_index = None
+        if self.hp <= 0:
+            # Combat pauses on defeat; finish transient visuals while the fall plays.
+            self.dash_trail.clear()
+            self.impact_timer = max(0,self.impact_timer-1)
+            self.dust_timer = max(0,self.dust_timer-1)
+            if self.death_started is None: self.death_started = pygame.time.get_ticks()
+            state, index = 'death', timed_frame((pygame.time.get_ticks()-self.death_started)*60//1000,
+                                                DEATH_DURATIONS, loop=False)
+        elif self.dash_timer:
+            state, index = 'dash', timed_frame(max(0,DASH_FRAMES-self.dash_timer-1),DASH_POSE_DURATIONS,False)
+        elif self.attack_timer:
+            state, index = 'attack', self.attack_frame
+            weapon_index = index
+        elif self.hurt_visual_timer:
+            state, index = 'hurt', min(2,(HURT_FRAMES-self.hurt_visual_timer)//3)
+        elif self.dash_recovery_timer:
+            state, index = 'dash', 3+timed_frame(sum(DASH_RECOVERY_DURATIONS)-self.dash_recovery_timer,
+                                               DASH_RECOVERY_DURATIONS,False)
+        elif self.moving or self.walk_frame:
+            state, index = 'walk', self.walk_frame
+        sprite = self.visual.image(state,self.facing,index,flash=self.hurt_visual_timer > 5)
+        for trail_x,trail_y,age,trail_facing,trail_index in self.dash_trail[-2:]:
+            dash_image = self.visual.image('dash',trail_facing,trail_index)
+            canvas.blit(self.visual.ghosts[dash_image,age],
+                        self.visual.body_origin(trail_x,trail_y,camera))
+        # Damage remains readable: bright reaction, then a subtle blink, never invisible.
+        if self.invulnerability_timer and not self.hurt_visual_timer and self.hp > 0:
+            sprite = alpha_image(sprite,145 if (self.invulnerability_timer//4)%2 else 255)
+        canvas.blit(sprite,self.visual.body_origin(self.x,self.y,camera))
+        if weapon_index is not None:
+            canvas.blit(self.visual.weapons[self.facing][weapon_index],
+                        self.visual.weapon_origin(self.x,self.y,camera))
+        draw_effect(canvas,camera,self.dust_fx,*self.dust_position,self.dust_timer)
+
+    def draw_impact(self,canvas,camera):
+        draw_effect(canvas,camera,self.critical_fx if self.impact_critical else self.impact_fx,
+                    *self.impact_position,self.impact_timer)

@@ -5,6 +5,7 @@ import pygame
 
 from entities.npc import NPC
 from core.assets import load
+from ui.character_art import DRAW_SIZE, PIVOT, FRAME, character_sheet
 
 
 RESIDENT_DIALOGUES = {
@@ -62,13 +63,13 @@ class Silhouette:
     def __init__(self, sheet):
         frame = sheet.subsurface((0, 0, 32, 32)).copy()
         frame.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
-        self.image = pygame.transform.scale(frame, (48, 48))
+        self.image = pygame.transform.scale(frame, (DRAW_SIZE, DRAW_SIZE))
         self.x = self.y = 0
         self.config = {"hitbox_radius": 10}
 
     def draw(self, canvas, camera):
-        canvas.blit(self.image, (round(self.x - 24 - camera[0]),
-                                 round(self.y - 42 - camera[1])))
+        canvas.blit(self.image, (round(self.x - DRAW_SIZE/2 - camera[0]),
+                                 round(self.y - PIVOT[1]*DRAW_SIZE/FRAME - camera[1])))
 
 
 class ArrivalScene:
@@ -113,7 +114,7 @@ class ArrivalScene:
         self.actor_added = False
         self.actor = NPC(
             "prologue_villager", "Morador", (0, 0), {"default": []},
-            idle_sprite, run_sprite=run_sprite, frame_size=32,
+            idle_sprite, run_sprite=character_sheet(load,'civilian_man','walk'), frame_size=32,
             draw_size=48)
         self.actor.enabled = False
         self.region = region

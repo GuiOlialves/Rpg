@@ -1,10 +1,11 @@
 """Short scripted red-soldier encounters and the insignia memory."""
 import pygame
+import environment
 
 from entities.enemy import Enemy
 from story.arrival_scene import ScriptedDialogue, Silhouette
 from story.sequence import Beat, NarrativeSequence
-from ui.character_art import draw_character
+from ui.character_art import draw_character, FRAME
 
 
 AMBUSH_LINES = (
@@ -50,7 +51,9 @@ class RedContact:
         # Decoration derived from already-recorded casualties, never a new enemy.
         if self.fallen_image is None:
             self.fallen_image = self.actor.death_sheet
+        environment.shadow(canvas,(self.actor.x-camera[0],self.actor.y-camera[1]),42,8,38)
         draw_character(canvas, camera, self.fallen_image, self.actor.x, self.actor.y,
+                       index=self.fallen_image.get_width()//FRAME-1,
                        facing=1 if self.actor.facing < 0 else 2)
 
 
@@ -61,6 +64,8 @@ def prepare_red_contacts(groups, load):
         if path not in sheets:
             sheets[path] = load(path)
         return sheets[path]
+    # Regions rebuild this closure; visual atlases still share the canonical loader.
+    cached_load.character_source_loader = load
 
     contacts = []
     for index, positions in enumerate(groups):

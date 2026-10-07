@@ -1,22 +1,15 @@
 # O Vale
 
-**Versão atual: 0.33**
-
-O Prólogo — O Nome que Falta está implementado até o encerramento. Este checkpoint deixa o projeto temporariamente pausado/arquivado para retomada futura; o Capítulo 1 ainda não deve ser implementado.
+O Prólogo — O Nome que Falta está completo. O Capítulo 1 está implementado até o bloco 1D, com retorno ao Vale, antiga estrada, Posto de Vigia e encontro com Edrin.
 
 ## Estado atual
 
 O prólogo completo reúne Vila, Casa, Floresta e Deserto, combate, boss do Oficial Vermelho, cutscenes, Save/Load, debug e checkpoints narrativos, inventário e progressão já existentes.
 
-O protagonista e suas animações atuais ainda não representam a qualidade visual desejada.
+O passe visual inclui novos sprites e animações, corte lateral de espada com hitbox correspondente, dash e proporções mais compactas para o protagonista. O Oficial Vermelho agora tem 400 HP e 16 de dano base.
 
 ## Próximos passos
 
-1. Melhorar as animações do protagonista.
-2. Recuperar ou refazer a animação de ataque de espada.
-3. Finalizar a integração e o refino do novo estilo de sprites.
-4. Fazer a revisão visual final do prólogo.
-5. Testar o prólogo completo como jogador, sem debug.
-6. Somente depois iniciar o Capítulo 1.
+O destino da Ponte de Namar fica para o próximo bloco. Consulte a [documentação do bloco 1D](pygame/CHAPTER_1D.md) para o estado narrativo e a persistência do encontro com Edrin.
 
 O jogo em Pygame fica em [`pygame/`](pygame/). Para instalação e execução, consulte o [README do Pygame](pygame/README.md).

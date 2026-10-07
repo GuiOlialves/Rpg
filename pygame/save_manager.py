@@ -12,9 +12,11 @@ import pygame
 
 from entities.enemy import Drop
 from systems.equipment import EQUIPMENT, SLOTS, item as equipment_item
-from systems.items import CONSUMABLES, consumable
+from systems.items import CONSUMABLES, QUEST_ITEMS, consumable, quest_item
 from systems.quest import ACTIVE, AVAILABLE, COMPLETED, REWARDED, QuestManager
 from story.story_manager import StoryManager
+from story.watchpost import POST_FLAGS, MAIN_EVIDENCE
+from story.edrin_encounter import EDRIN_FLAGS, PHASE_FLAGS
 
 
 SAVE_VERSION = 1
@@ -24,14 +26,18 @@ if getattr(sys, "frozen", False):
     SAVE_PATH = Path(sys.executable).with_name("savegame.json")
 else:
     SAVE_PATH = Path(__file__).with_name("savegame.json")
-REGIONS = {"home", "village", "forest", "desert"}
+REGIONS = {"home", "village", "forest", "desert", "old_road", "watchpost", "pursuit"}
 CHESTS = {"desert_chest_oasis", "desert_chest_ruins", "desert_chest_hidden"}
+CHESTS |= {"road_chest_turnout", "road_chest_shelter", "road_chest_caravan"}
 STATS = ("vitalidade", "força", "magia", "agilidade")
 SAFE_SPAWNS = {
     "home": ((512, 288),),
     "village": ((1024, 576), (1850, 575)),
     "forest": ((120, 575), (1245, 82)),
     "desert": ((1025, 105),),
+    "old_road": ((1910, 850), (1810, 850)),
+    "watchpost": ((768,914), (1260,765)),
+    "pursuit": ((110,600), (830,400)),
 }
 
 
@@ -89,10 +95,11 @@ def _position(value, label):
 def _item_record(value, label, equipment_allowed=True):
     data = _object(value, label)
     item_id = data.get("id")
-    if type(item_id) is not str or item_id not in CONSUMABLES and (not equipment_allowed or item_id not in EQUIPMENT):
+    allowed = set(CONSUMABLES) | (set(EQUIPMENT) | set(QUEST_ITEMS) if equipment_allowed else set())
+    if type(item_id) is not str or item_id not in allowed:
         raise SaveError(f"Save inválido: ID de item desconhecido em {label}.")
     amount = _integer(data.get("amount"), label + ".amount", 1, 9999)
-    if item_id in EQUIPMENT and amount != 1:
+    if item_id in (set(EQUIPMENT) | set(QUEST_ITEMS)) and amount != 1:
         raise SaveError(f"Save inválido: equipamento empilhado em {label}.")
     return item_id, amount
 
@@ -190,7 +197,7 @@ def validate(data):
     }
     # New optional flags default to False through StoryManager.get(), keeping
     # the existing prologue/legacy save shape until the conversation completes.
-    known_flags = set(story_defaults) | {
+    known_flags = set(story_defaults) | set(POST_FLAGS) | set(EDRIN_FLAGS) | {
         "alden_post_slimes_talk", "house_investigation_unlocked",
         "pendant_found", "house_searched",
         "blue_army_departed",
@@ -198,6 +205,11 @@ def validate(data):
         "forest_battle_progress", "red_officer_met", "red_officer_boss_ready", "red_officer_defeated",
         "forest_battle_casualties",
         "red_officer_memory_seen", "red_officer_escaped", "prologue_completed",
+        "chapter1_started", "chapter1_returned", "chapter1_alden_talk", "old_road_unlocked",
+        "old_road_entered", "road_red_clue_found", "road_blue_trace_found",
+        "road_memory_seen", "road_camp_found", "watchpost_seen",
+        "road_enemy_0_defeated", "road_enemy_1_defeated",
+        "road_enemy_2_defeated", "road_enemy_3_defeated",
     }
     if not set(story).issubset(known_flags):
         raise SaveError("Save inválido: flags narrativas desconhecidas.")
@@ -245,6 +257,56 @@ def validate(data):
         raise SaveError("Save inválido: Oficial escapou antes de concluir a memória.")
     if story.get("prologue_completed", False) and not story.get("red_officer_escaped", False):
         raise SaveError("Save inválido: prólogo concluído antes da fuga do Oficial.")
+    for flag, prerequisite in (("chapter1_started", "prologue_completed"),
+                               ("chapter1_returned", "chapter1_started"),
+                               ("chapter1_alden_talk", "chapter1_returned")):
+        if story.get(flag, False) and not story.get(prerequisite, False):
+            raise SaveError("Save inválido: retorno ao Vale e conversa com Alden inconsistentes.")
+    if story.get("old_road_unlocked", False) != story.get("chapter1_alden_talk", False):
+        raise SaveError("Save inválido: antiga estrada liberada antes da pista de Alden.")
+    if story.get("old_road_entered",False) and not story.get("old_road_unlocked",False):
+        raise SaveError("Save inválido: estrada visitada antes da pista de Alden.")
+    road_flags = ("road_red_clue_found", "road_blue_trace_found", "road_memory_seen", "road_camp_found",
+                  *(f"road_enemy_{i}_defeated" for i in range(4)))
+    if ((region_id == "old_road" or any(story.get(flag,False) for flag in road_flags))
+            and not story.get("old_road_entered",False)):
+        raise SaveError("Save inválido: descoberta antes da entrada na antiga estrada.")
+    if story.get("watchpost_seen",False) and not all(story.get(flag,False) for flag in
+            ("old_road_entered","road_red_clue_found","road_memory_seen","road_camp_found")):
+        raise SaveError("Save inválido: posto localizado antes das pistas da estrada.")
+    if story.get("watchpost_entered",False) and not story.get("watchpost_seen",False):
+        raise SaveError("Save inválido: entrada no posto antes de localizá-lo.")
+    if ((region_id == "watchpost" or any(story.get(f,False) for f in POST_FLAGS[1:]))
+            and not story.get("watchpost_entered",False)):
+        raise SaveError("Save inválido: descoberta antes da entrada no posto.")
+    if any(story.get(f,False) for f in POST_FLAGS[2:]) and not story.get("watchpost_entry_open",False):
+        raise SaveError("Save inválido: investigação antes da abertura lateral.")
+    personal = story.get("watchpost_personal_item_found",False)
+    if personal != ("escort_token" in inventory_ids):
+        raise SaveError("Save inválido: identificação pessoal e inventário inconsistentes.")
+    if story.get("watchpost_identity_confirmed",False) != (personal and story.get("watchpost_roster_read",False)):
+        raise SaveError("Save inválido: identidade antes das evidências do posto.")
+    if story.get("watchpost_blue_order_found",False) != story.get("watchpost_dispatch_read",False):
+        raise SaveError("Save inválido: ordem azul sem o despacho.")
+    if story.get("watchpost_flashback_seen",False) and not personal:
+        raise SaveError("Save inválido: memória do posto antes da identificação.")
+    if story.get("watchpost_search_noticed",False) != story.get("watchpost_flashback_seen",False):
+        raise SaveError("Save inválido: busca percebida antes da memória.")
+    if story.get("watchpost_presence_seen",False) and not all(story.get(f,False) for f in MAIN_EVIDENCE):
+        raise SaveError("Save inválido: presença percebida antes das evidências principais.")
+    if story.get("watchpost_trail_found",False) and not story.get("watchpost_presence_seen",False):
+        raise SaveError("Save inválido: trilha antes da presença no posto.")
+    if story.get('pursuit_entered', False) and not story.get('watchpost_trail_found', False):
+        raise SaveError('Save inválido: trilha visitada antes da saída do posto.')
+    if ((region_id == 'pursuit' or any(story.get(f, False) for f in EDRIN_FLAGS[1:]))
+            and not story.get('pursuit_entered', False)):
+        raise SaveError('Save inválido: encontro antes de entrar na trilha.')
+    prerequisite = 'pursuit_entered'
+    for flags in PHASE_FLAGS.values():
+        if any(story.get(f, False) for f in flags):
+            if not story.get(prerequisite, False) or not all(story.get(f, False) for f in flags):
+                raise SaveError('Save inválido: revelações de Edrin fora de ordem.')
+        prerequisite = flags[-1]
     data["story"] = story
     return data
 
@@ -354,6 +416,7 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
     data = read_save(path)
     character = data["player"]
     inventory = [consumable(entry["id"], entry["amount"]) if entry["id"] in CONSUMABLES
+                 else quest_item(entry["id"]) if entry["id"] in QUEST_ITEMS
                  else equipment_item(entry["id"]) for entry in data["inventory"]]
     by_id = {entry["id"]: entry for entry in inventory}
 
@@ -385,6 +448,10 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
                                      spawn_enemies, guardian_factory)
     story = StoryManager.from_dict(data["story"])
     story.apply_to_region(region)
+    if region_id == "old_road":
+        enemies = [enemy for enemy in enemies if not story.get(f"road_enemy_{enemy.road_id}_defeated")]
+    elif region_id == "watchpost":
+        enemies = [enemy for enemy in enemies if not story.get(f"watchpost_enemy_{enemy.watchpost_id}_defeated")]
     if (region_id == "forest" and story.get("blue_army_departed")
             and not quests.forest_event_started):
         enemies = []

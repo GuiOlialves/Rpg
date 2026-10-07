@@ -7,7 +7,7 @@
     16,
     28
   ],
-  "draw_scale": 1.5,
+  "draw_scale": 2,
   "directions": [
     "down",
     "left",
@@ -15,102 +15,200 @@
     "up"
   ],
   "palette": {
-    "ink": "#29242e",
-    "leather": "#574039",
-    "leather_light": "#886047",
-    "skin_shadow": "#b87956",
-    "skin": "#e0ad78",
-    "linen": "#d6c6a0",
-    "hair": "#4b3742",
-    "hair_light": "#886047",
-    "grey": "#94968b",
-    "steel": "#a5b8b6",
-    "steel_shadow": "#94968b",
-    "blue": "#48688d",
-    "blue_shadow": "#34455f",
-    "blue_light": "#7595b0",
-    "red": "#ad5148",
-    "red_shadow": "#743944",
-    "red_light": "#b87956",
-    "sage": "#7d8764",
-    "sage_shadow": "#58644f",
-    "ochre": "#d2b06a",
-    "gold": "#d2b06a",
-    "hair_glint": "#80687e"
+    "ink": "#252b3c",
+    "deep": "#343b4d",
+    "leather": "#61463f",
+    "leather_light": "#a07451",
+    "skin_shadow": "#b97659",
+    "skin": "#e4af80",
+    "skin_light": "#f4cba0",
+    "linen": "#e1d5af",
+    "hair": "#503d45",
+    "hair_light": "#96614f",
+    "grey": "#93a3a3",
+    "steel": "#b7cfca",
+    "steel_shadow": "#657e8d",
+    "steel_light": "#edf0d1",
+    "teal": "#3f7a78",
+    "teal_shadow": "#2e505c",
+    "teal_light": "#6ca49a",
+    "blue": "#4d719a",
+    "blue_shadow": "#354967",
+    "blue_light": "#88a8c4",
+    "red": "#b85c57",
+    "red_shadow": "#713d50",
+    "red_light": "#e18a67",
+    "sage": "#778962",
+    "sage_shadow": "#495b54",
+    "sage_light": "#a8b57a",
+    "ochre": "#c3a066",
+    "ochre_shadow": "#826b52",
+    "gold": "#d4ab65",
+    "copper": "#c57550",
+    "copper_shadow": "#834b48",
+    "copper_light": "#edb26b",
+    "violet": "#796786",
+    "violet_shadow": "#494258"
   },
   "characters": {
     "protagonist": {
       "idle": {
         "file": "protagonist_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4,
+        "frame_size": [
+          32,
+          36
+        ],
+        "pivot": [
+          16,
+          34
+        ]
       },
       "walk": {
         "file": "protagonist_walk.png",
-        "frames_per_direction": 6
+        "frames_per_direction": 8,
+        "frame_size": [
+          32,
+          36
+        ],
+        "pivot": [
+          16,
+          34
+        ]
       },
       "attack": {
         "file": "protagonist_attack.png",
-        "frames_per_direction": 8
+        "frames_per_direction": 8,
+        "frame_size": [
+          32,
+          36
+        ],
+        "pivot": [
+          16,
+          34
+        ]
+      },
+      "windup": {
+        "file": "protagonist_windup.png",
+        "frames_per_direction": 2,
+        "frame_size": [
+          32,
+          36
+        ],
+        "pivot": [
+          16,
+          34
+        ]
+      },
+      "hurt": {
+        "file": "protagonist_hurt.png",
+        "frames_per_direction": 3,
+        "frame_size": [
+          32,
+          36
+        ],
+        "pivot": [
+          16,
+          34
+        ]
+      },
+      "death": {
+        "file": "protagonist_death.png",
+        "frames_per_direction": 4,
+        "frame_size": [
+          32,
+          36
+        ],
+        "pivot": [
+          16,
+          34
+        ]
+      },
+      "dash": {
+        "file": "protagonist_dash.png",
+        "frames_per_direction": 5,
+        "frame_size": [
+          32,
+          36
+        ],
+        "pivot": [
+          16,
+          34
+        ]
       }
     },
     "civilian_man": {
       "idle": {
         "file": "civilian_man_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "civilian_man_walk.png",
-        "frames_per_direction": 4
+        "frames_per_direction": 8
       }
     },
     "civilian_woman": {
       "idle": {
         "file": "civilian_woman_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "civilian_woman_walk.png",
-        "frames_per_direction": 4
+        "frames_per_direction": 8
       }
     },
     "civilian_elder": {
       "idle": {
         "file": "civilian_elder_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "civilian_elder_walk.png",
-        "frames_per_direction": 4
+        "frames_per_direction": 8
       }
     },
     "civilian_merchant": {
       "idle": {
         "file": "civilian_merchant_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "civilian_merchant_walk.png",
-        "frames_per_direction": 4
+        "frames_per_direction": 8
       }
     },
     "civilian_worker": {
       "idle": {
         "file": "civilian_worker_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "civilian_worker_walk.png",
+        "frames_per_direction": 8
+      }
+    },
+    "blue_commander": {
+      "idle": {
+        "file": "blue_commander_idle.png",
         "frames_per_direction": 4
+      },
+      "walk": {
+        "file": "blue_commander_walk.png",
+        "frames_per_direction": 8
+      },
+      "fallen": {
+        "file": "blue_commander_fallen.png",
+        "frames_per_direction": 2
       }
     },
     "blue_soldier_0": {
       "idle": {
         "file": "blue_soldier_0_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "blue_soldier_0_walk.png",
-        "frames_per_direction": 4
+        "frames_per_direction": 8
       },
       "fallen": {
         "file": "blue_soldier_0_fallen.png",
@@ -120,11 +218,11 @@
     "blue_soldier_1": {
       "idle": {
         "file": "blue_soldier_1_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "blue_soldier_1_walk.png",
-        "frames_per_direction": 4
+        "frames_per_direction": 8
       },
       "fallen": {
         "file": "blue_soldier_1_fallen.png",
@@ -134,125 +232,119 @@
     "blue_soldier_2": {
       "idle": {
         "file": "blue_soldier_2_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "blue_soldier_2_walk.png",
-        "frames_per_direction": 4
+        "frames_per_direction": 8
       },
       "fallen": {
         "file": "blue_soldier_2_fallen.png",
         "frames_per_direction": 1
       }
     },
-    "blue_commander": {
-      "idle": {
-        "file": "blue_commander_idle.png",
-        "frames_per_direction": 1
-      },
-      "walk": {
-        "file": "blue_commander_walk.png",
-        "frames_per_direction": 4
-      },
-      "fallen": {
-        "file": "blue_commander_fallen.png",
-        "frames_per_direction": 2
-      }
-    },
     "red_soldier_0": {
       "idle": {
         "file": "red_soldier_0_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "red_soldier_0_walk.png",
+        "frames_per_direction": 8
+      },
+      "attack": {
+        "file": "red_soldier_0_attack.png",
+        "frames_per_direction": 8
+      },
+      "windup": {
+        "file": "red_soldier_0_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "red_soldier_0_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "red_soldier_0_death.png",
         "frames_per_direction": 4
       },
       "fallen": {
         "file": "red_soldier_0_fallen.png",
-        "frames_per_direction": 1
-      },
-      "attack": {
-        "file": "red_soldier_0_attack.png",
-        "frames_per_direction": 3
-      },
-      "windup": {
-        "file": "red_soldier_0_windup.png",
-        "frames_per_direction": 1
-      },
-      "hurt": {
-        "file": "red_soldier_0_hurt.png",
         "frames_per_direction": 1
       }
     },
     "red_soldier_1": {
       "idle": {
         "file": "red_soldier_1_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "red_soldier_1_walk.png",
+        "frames_per_direction": 8
+      },
+      "attack": {
+        "file": "red_soldier_1_attack.png",
+        "frames_per_direction": 8
+      },
+      "windup": {
+        "file": "red_soldier_1_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "red_soldier_1_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "red_soldier_1_death.png",
         "frames_per_direction": 4
       },
       "fallen": {
         "file": "red_soldier_1_fallen.png",
-        "frames_per_direction": 1
-      },
-      "attack": {
-        "file": "red_soldier_1_attack.png",
-        "frames_per_direction": 3
-      },
-      "windup": {
-        "file": "red_soldier_1_windup.png",
-        "frames_per_direction": 1
-      },
-      "hurt": {
-        "file": "red_soldier_1_hurt.png",
         "frames_per_direction": 1
       }
     },
     "red_soldier_2": {
       "idle": {
         "file": "red_soldier_2_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "red_soldier_2_walk.png",
+        "frames_per_direction": 8
+      },
+      "attack": {
+        "file": "red_soldier_2_attack.png",
+        "frames_per_direction": 8
+      },
+      "windup": {
+        "file": "red_soldier_2_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "red_soldier_2_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "red_soldier_2_death.png",
         "frames_per_direction": 4
       },
       "fallen": {
         "file": "red_soldier_2_fallen.png",
-        "frames_per_direction": 1
-      },
-      "attack": {
-        "file": "red_soldier_2_attack.png",
-        "frames_per_direction": 3
-      },
-      "windup": {
-        "file": "red_soldier_2_windup.png",
-        "frames_per_direction": 1
-      },
-      "hurt": {
-        "file": "red_soldier_2_hurt.png",
         "frames_per_direction": 1
       }
     },
     "red_officer": {
       "idle": {
         "file": "red_officer_idle.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 4
       },
       "walk": {
         "file": "red_officer_walk.png",
-        "frames_per_direction": 4
-      },
-      "fallen": {
-        "file": "red_officer_fallen.png",
-        "frames_per_direction": 1
+        "frames_per_direction": 8
       },
       "attack": {
         "file": "red_officer_attack.png",
-        "frames_per_direction": 3
+        "frames_per_direction": 8
       },
       "windup": {
         "file": "red_officer_windup.png",
@@ -260,13 +352,144 @@
       },
       "hurt": {
         "file": "red_officer_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "red_officer_death.png",
+        "frames_per_direction": 4
+      },
+      "fallen": {
+        "file": "red_officer_fallen.png",
         "frames_per_direction": 1
       },
       "defeated": {
         "file": "red_officer_defeated.png",
         "frames_per_direction": 1
       }
+    },
+    "warrior": {
+      "idle": {
+        "file": "warrior_idle.png",
+        "frames_per_direction": 4
+      },
+      "walk": {
+        "file": "warrior_walk.png",
+        "frames_per_direction": 8
+      },
+      "attack": {
+        "file": "warrior_attack.png",
+        "frames_per_direction": 8
+      },
+      "windup": {
+        "file": "warrior_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "warrior_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "warrior_death.png",
+        "frames_per_direction": 4
+      }
+    },
+    "desert_scout": {
+      "idle": {
+        "file": "desert_scout_idle.png",
+        "frames_per_direction": 4
+      },
+      "walk": {
+        "file": "desert_scout_walk.png",
+        "frames_per_direction": 8
+      },
+      "attack": {
+        "file": "desert_scout_attack.png",
+        "frames_per_direction": 8
+      },
+      "windup": {
+        "file": "desert_scout_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "desert_scout_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "desert_scout_death.png",
+        "frames_per_direction": 4
+      }
+    },
+    "dune_lancer": {
+      "idle": {
+        "file": "dune_lancer_idle.png",
+        "frames_per_direction": 4
+      },
+      "walk": {
+        "file": "dune_lancer_walk.png",
+        "frames_per_direction": 8
+      },
+      "attack": {
+        "file": "dune_lancer_attack.png",
+        "frames_per_direction": 8
+      },
+      "windup": {
+        "file": "dune_lancer_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "dune_lancer_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "dune_lancer_death.png",
+        "frames_per_direction": 4
+      }
+    },
+    "forest_guardian": {
+      "idle": {
+        "file": "forest_guardian_idle.png",
+        "frames_per_direction": 4
+      },
+      "walk": {
+        "file": "forest_guardian_walk.png",
+        "frames_per_direction": 8
+      },
+      "attack": {
+        "file": "forest_guardian_attack.png",
+        "frames_per_direction": 8
+      },
+      "windup": {
+        "file": "forest_guardian_windup.png",
+        "frames_per_direction": 2
+      },
+      "hurt": {
+        "file": "forest_guardian_hurt.png",
+        "frames_per_direction": 3
+      },
+      "death": {
+        "file": "forest_guardian_death.png",
+        "frames_per_direction": 4
+      }
     }
+  },
+  "weapons": {
+    "frame_size": [
+      96,
+      96
+    ],
+    "pivot": [
+      48,
+      58
+    ],
+    "frames_per_direction": 8,
+    "heavy_frame_size": [
+      160,
+      160
+    ],
+    "heavy_pivot": [
+      80,
+      90
+    ]
   },
   "player_compatibility": {
     "cell_size": [
@@ -275,7 +498,7 @@
     ],
     "native_offset": [
       16,
-      20
+      14
     ],
     "pivot": [
       32,

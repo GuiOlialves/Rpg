@@ -30,6 +30,9 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
         environment.shadow(canvas,(actor.x-camera[0],actor.y-camera[1]),round(radius*1.6),10,38)
     if player is not None:
         entities.append((player.y, "player", player))
+        if player.impact_timer:
+            # Place the burst just after the struck body's feet, under foreground scenery.
+            entities.append((player.impact_position[1]+12+.1,"impact",player))
     for enemy in enemies or []:
         entities.append((enemy.y, "enemy", enemy))
     for drop in drops or []:
@@ -45,6 +48,8 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
             pos.draw(canvas,camera,player)
         elif image == "fallen":
             pos.draw_fallen(canvas, camera)
+        elif image == 'impact':
+            pos.draw_impact(canvas,camera)
         elif image == "player" or image == "enemy" or image == "drop" or image == "npc" or image == "interactable":
             pos.draw(canvas, camera)
         else:
@@ -191,7 +196,11 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
     for exit_name, exit_rect in (region["exits"].items() if show_controls else ()):
         viewport = pygame.Rect(camera[0], camera[1], VIEW[0], VIEW[1])
         if viewport.colliderect(exit_rect):
-            label = "FLORESTA" if exit_name == "forest" else "VILA" if exit_name == "village" else "DESERTO" if exit_name == "desert" else "RUÍNAS"
+            label = ("ANTIGA ESTRADA" if exit_name in {"old_road","old_road_future"} else
+                     "POSTO DE VIGIA" if exit_name in {"watchpost","watchpost_future"} else
+                     "TRILHA RECENTE" if exit_name == "pursuit" else
+                     "PONTE DE NAMAR" if exit_name == "namar_future" else
+                     "FLORESTA" if exit_name == "forest" else "VILA" if exit_name == "village" else "DESERTO" if exit_name == "desert" else "RUÍNAS")
             draw_key_prompt(canvas, f"Saída: {label}", font,
                             exit_rect.centerx - camera[0],
                             exit_rect.top - camera[1] - 34)

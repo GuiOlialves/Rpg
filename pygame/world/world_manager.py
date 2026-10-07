@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 from entities.enemy import Enemy
-from world.regions import desert, forest, home, village
+from world.regions import desert, forest, home, village, old_road, watchpost, pursuit
 
 
 @dataclass
@@ -27,6 +27,9 @@ class WorldManager:
             "village": lambda _opened_chests: village.build_playable(load),
             "forest": lambda _opened_chests: forest.build(load),
             "desert": lambda opened_chests: desert.build(load, opened_chests),
+            "old_road": lambda opened_chests: old_road.build(load, opened_chests),
+            "watchpost": lambda opened_chests: watchpost.build(load, opened_chests),
+            "pursuit": lambda opened_chests: pursuit.build(load, opened_chests),
         }, load=load)
 
     @property
@@ -42,8 +45,16 @@ class WorldManager:
 
     def spawn_enemies(self, region, load=None):
         load = load or self._load
-        return [Enemy(kind, position, load, seed=index)
-                for index, (kind, position) in enumerate(region.get("enemy_spawns", []))]
+        factory = region.get("enemy_factory", Enemy)
+        enemies = [factory(kind, position, load, seed=index)
+                   for index, (kind, position) in enumerate(region.get("enemy_spawns", []))]
+        if region.get("ambient_kind") == "old_road":
+            for index, enemy in enumerate(enemies):
+                enemy.road_id = index
+        elif region.get("ambient_kind") == "watchpost":
+            for index, enemy in enumerate(enemies):
+                enemy.watchpost_id = index
+        return enemies
 
     def reset_forest_boss_encounter(self, load=None):
         load = load or self._load
@@ -66,11 +77,14 @@ class WorldManager:
             return RegionTransition(source, {}, [], (0, 0),
                                     ("Derrote o Guardião da Clareira para seguir ao norte."
                                      if quests.forest_event_started else "O caminho ao norte está bloqueado."), True)
-        if destination == "ruins_future":
+        if destination in {"ruins_future", "namar_future"}:
             region = source_region if source_region is not None else self.build_region(source)
-            if not region.get("future_exit_notified"):
-                region["future_exit_notified"] = True
+            notice_key = "future_exit_notified" if destination == "ruins_future" else "namar_exit_notified"
+            if not region.get(notice_key):
+                region[notice_key] = True
                 return RegionTransition(source, region, [], (0, 0),
+                                        "A trilha termina no barranco. Para Namar, preciso encontrar outro caminho."
+                                        if destination == "namar_future" else
                                         "A estrada continua até as ruínas distantes.")
             return RegionTransition(source, region, [], (0, 0))
         if destination not in self._region_builders:

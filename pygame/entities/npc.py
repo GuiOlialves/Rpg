@@ -1,6 +1,7 @@
 import math
 import pygame
-from ui.character_art import FRAME, draw_character
+from ui.character_art import FRAME, DRAW_SIZE, PIVOT, prepared_frames
+from core.animation import IDLE_DURATIONS, WALK_STRIDE_PIXELS, timed_frame
 
 class NPC:
     def __init__(self, uid, name, position, dialogues, sprite, run_sprite=None,
@@ -18,6 +19,23 @@ class NPC:
         self.quest_id = None
         self.quest_effects_enabled = True
         self.facing, self.anim_tick = 0, 0
+        self.own_art = frame_size == FRAME and sprite.get_height() == FRAME*4
+        if self.own_art:
+            self.draw_size = DRAW_SIZE
+        self.visual_distance = 0.0
+        self.last_visual_position = (self.x,self.y)
+        self.idle_offset = sum(map(ord,uid))*7
+        self.prepared = prepared_frames(sprite,self.draw_size,cell=frame_size,height=self.frame_height)
+        self.prepared_run = (prepared_frames(run_sprite,self.draw_size,cell=frame_size,height=self.frame_height)
+                             if run_sprite is not None else self.prepared)
+        self.prepared_left = self.prepared_run_left = None
+        if not self.own_art:
+            self.prepared_left = tuple(tuple(pygame.transform.flip(im,True,False) for im in row)
+                                       for row in self.prepared)
+            self.prepared_run_left = tuple(tuple(pygame.transform.flip(im,True,False) for im in row)
+                                           for row in self.prepared_run)
+        # Legacy one-row NPCs retain their original whole-body foot contract.
+        self.source_foot = sprite.subsurface((0,0,frame_size,self.frame_height)).get_bounding_rect().bottom
 
     def available(self, context=None):
         return self.enabled
@@ -48,25 +66,21 @@ class NPC:
         else: self.facing = 0 if dy > 0 else 3
 
     def draw(self, canvas, camera):
-        sheet = self.run_sprite if self.running and self.run_sprite else self.sprite
-        frame_count = max(1, sheet.get_width() // self.frame_size)
-        frame_index = (self.anim_tick // 5) % frame_count if self.running else 0
-        if self.frame_size == FRAME and sheet.get_height() == FRAME * 4:
-            draw_character(canvas, camera, sheet, self.x, self.y, frame_index,
-                           self.facing, self.draw_size)
-            return
-        frame = sheet.subsurface((frame_index * self.frame_size, 0,
-                                  self.frame_size, self.frame_height)).copy()
-        if self.facing == 1:
-            frame = pygame.transform.flip(frame, True, False)
-        source_foot = self.sprite.subsurface((0, 0, self.frame_size,
-                                              self.frame_height)).get_bounding_rect().bottom
-        scaled_height = max(1, round(self.draw_size * self.frame_height / self.frame_size))
-        frame = pygame.transform.scale(frame, (self.draw_size, scaled_height))
-        if self.foot_ratio is None:
-            foot_offset = math.ceil(source_foot * scaled_height / self.frame_height)
-        else:
-            foot_offset = round(self.foot_ratio * scaled_height)
+        distance = math.dist(self.last_visual_position,(self.x,self.y))
+        self.last_visual_position = (self.x,self.y)
+        moving = self.running and .01 < distance < 32
+        if moving:
+            self.visual_distance = (self.visual_distance+distance) % WALK_STRIDE_PIXELS
+        frames = self.prepared_run if moving else self.prepared
+        if not self.own_art and self.facing == 1:
+            frames = self.prepared_run_left if moving else self.prepared_left
+        frame_index = (int(self.visual_distance/WALK_STRIDE_PIXELS*len(frames[0]))
+                       if moving else timed_frame(pygame.time.get_ticks()*60//1000+self.idle_offset,IDLE_DURATIONS))
+        frame = frames[self.facing if self.own_art else 0][frame_index%len(frames[0])]
+        scaled_height = frame.get_height()
+        foot_offset = (PIVOT[1]*self.draw_size/FRAME if self.own_art
+                       else math.ceil(self.source_foot*scaled_height/self.frame_height)
+                       if self.foot_ratio is None else round(self.foot_ratio*scaled_height))
         canvas.blit(frame, (round(self.x - self.draw_size / 2 - camera[0]),
                             round(self.y - foot_offset - camera[1])))
 

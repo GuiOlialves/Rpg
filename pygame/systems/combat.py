@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import pygame
 
 from core.config import HITSTOP_NORMAL_FRAMES, HITSTOP_STRONG_FRAMES, STAT_POINTS_PER_LEVEL
+from core.animation import IMPACT_TEXT_HEADROOM
 from systems.equipment import item
 from systems.inventory import add_inventory_item
 
@@ -25,6 +26,8 @@ class CombatFrame:
     player_defeated: bool = False
     feedback: list = field(default_factory=list)
     defeated_soldiers: list = field(default_factory=list)
+    defeated_road_enemies: list = field(default_factory=list)
+    defeated_watchpost_enemies: list = field(default_factory=list)
 
 
 class CombatSystem:
@@ -36,6 +39,8 @@ class CombatSystem:
         feedback = []
         autosave_pending = False
         defeated_soldiers = []
+        defeated_road_enemies = []
+        defeated_watchpost_enemies = []
         if region_id == "forest":
             region["north_locked"] = not quests.forest_boss_defeated
 
@@ -51,6 +56,7 @@ class CombatSystem:
             hp_before = player.hp
             enemy.update(player, region["obstacles"])
             if player.hp < hp_before:
+                player.confirm_impact(player.x,player.y,strong=enemy.attack_action == 'charged')
                 hitstop_frames = max(
                     hitstop_frames,
                     HITSTOP_STRONG_FRAMES if enemy.attack_action == "charged"
@@ -59,7 +65,7 @@ class CombatSystem:
                     str(hp_before - player.hp), (player.x, player.y - 82),
                     (250, 108, 104)))
 
-            if (player.attack_box.colliderect(enemy.hurtbox)
+            if (player.attack_hits(enemy.hurtbox)
                     and getattr(enemy, "last_player_attack", -1) != player.attack_serial):
                 enemy_hp_before = enemy.hp
                 if enemy.receive_hit(player.current_attack_damage, player.x, player.y,
@@ -69,10 +75,12 @@ class CombatSystem:
                         HITSTOP_STRONG_FRAMES if player.attack_is_critical
                         else HITSTOP_NORMAL_FRAMES)
                     enemy.last_player_attack = player.attack_serial
+                    player.confirm_impact(enemy.x,enemy.y,player.attack_is_critical,
+                                          strong=enemy.kind in {'red_officer','forest_guardian'})
                     feedback.append(CombatFeedback(
                         f"{enemy_hp_before - enemy.hp}{'!' if player.attack_is_critical else ''}",
-                        (enemy.x, enemy.y - enemy.config["frame_size"]
-                         * enemy.config["scale"] * 0.8),
+                        (enemy.x, enemy.y - enemy.visual_foot*enemy.config['scale']
+                         - IMPACT_TEXT_HEADROOM),
                         (255, 210, 103) if player.attack_is_critical else (238, 239, 223),
                         player.attack_is_critical))
 
@@ -80,6 +88,10 @@ class CombatSystem:
             if new_drop is not None:
                 drops.append(new_drop)
             if enemy.state == "DEAD" and enemy.dead_timer == 35:
+                if region_id == "old_road" and hasattr(enemy,"road_id"):
+                    defeated_road_enemies.append(enemy.road_id)
+                if region_id == "watchpost" and hasattr(enemy,"watchpost_id"):
+                    defeated_watchpost_enemies.append(enemy.watchpost_id)
                 if enemy.kind == "red_soldier" and hasattr(enemy, "scripted_id"):
                     defeated_soldiers.append(enemy.scripted_id)
                 old_level = player.level
@@ -119,4 +131,5 @@ class CombatSystem:
                 add_inventory_item(inventory, drop.item)
                 drops.remove(drop)
         return CombatFrame(enemies, drops, hitstop_frames, autosave_pending,
-                           player.hp <= 0, feedback, defeated_soldiers)
+                           player.hp <= 0, feedback, defeated_soldiers, defeated_road_enemies,
+                           defeated_watchpost_enemies)

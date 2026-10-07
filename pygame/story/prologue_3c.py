@@ -51,11 +51,10 @@ class _PastProtagonist:
         self.player = player
         self.x, self.y = player.x + 17, player.y + 3
         self.depth = self.y
+        self.image = player.visual.image('idle',1).copy()
+        self.image.fill((214,135,139,255),special_flags=pygame.BLEND_RGBA_MULT)
     def draw(self, canvas, camera, player=None):
-        image = pygame.transform.scale(frame(self.player.idle, 0, 1), (96, 96))
-        image.fill((214, 135, 139, 255), special_flags=pygame.BLEND_RGBA_MULT)
-        canvas.blit(image, (round(self.x - 48 - camera[0]),
-                            round(self.y - 72 - camera[1])))
+        canvas.blit(self.image,self.player.visual.body_origin(self.x,self.y,camera))
 
 
 class _PlacedObject:

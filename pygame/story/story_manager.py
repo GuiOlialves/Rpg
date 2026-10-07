@@ -50,6 +50,15 @@ class StoryManager:
 
     @property
     def objective_text(self):
+        if self.get("edrin_encounter_completed"):
+            return "Descubra o que aconteceu na Ponte de Namar."
+        if self.get("watchpost_trail_found"):
+            return "Encontre quem estava no posto."
+        if self.get("watchpost_seen"):
+            return "Investigue o antigo posto de vigia."
+        if self.get("chapter1_returned"):
+            return ("Investigue a antiga estrada." if self.get("chapter1_alden_talk")
+                    else "Fale com Alden.")
         if self.get("prologue_completed") or self.get("red_officer_defeated"):
             return ""
         if self.get("red_officer_boss_ready"):
@@ -62,6 +71,10 @@ class StoryManager:
         if self.get("house_searched"):
             return "Saia da casa."
         return ("Investigue a casa." if self.get("house_investigation_unlocked") else "")
+
+    @property
+    def objective_title(self):
+        return "Ecos da Guerra" if self.get("chapter1_returned") else "OBJETIVO ATUAL"
 
     @property
     def home_phase(self):
@@ -89,6 +102,22 @@ class StoryManager:
                 region["interactables"] = [
                     obj for obj in region.get("interactables", [])
                     if obj.uid != "broken_pendant"]
+
+        elif region.get("ambient_kind") == "village" and self.get("chapter1_returned"):
+            from story.chapter1_return import apply_village_aftermath
+            apply_village_aftermath(region, self)
+
+        elif region.get("ambient_kind") == "old_road":
+            from story.old_road import apply_road_state
+            apply_road_state(region, self)
+
+        elif region.get("ambient_kind") == "pursuit":
+            from story.edrin_encounter import apply_state
+            apply_state(region, self)
+
+        elif region.get("ambient_kind") == "watchpost":
+            from story.watchpost import apply_post_state
+            apply_post_state(region, self)
 
         elif region.get("ambient_kind") == "forest":
             post_march = self.get("blue_army_departed")
