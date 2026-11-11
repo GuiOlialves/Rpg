@@ -2,6 +2,7 @@
 import random
 import pygame
 import environment as env
+from world import asset_art
 from entities.edrin import Edrin
 from entities.interactable import Interactable
 from world.regions.old_road_art import prop
@@ -21,6 +22,10 @@ def build(load, opened_chests=None):
                             (147, 126, 89), 28, 119)
     env.paths(terrain, [(TRAIL, 58)], dirt, 119,
               [((1000, 385), (245, 165))], tufts)
+    # A narrow lower ledge reaches the dry bank without crossing the collapsed bridge.
+    env.paths(terrain, [([(960, 465), (1060, 555), (1180, 565)], 42)], dirt, 120)
+    for y in range(535, 584, 8):
+        pygame.draw.line(terrain, (150, 139, 104), (1138, y), (1188, y), 3)
     scenery, obstacles = [], []
 
     def place(image, foot, box=None, canopy=False):
@@ -42,7 +47,7 @@ def build(load, opened_chests=None):
             place(rock, (x, y))
     # The upper stand partly hides the distant patrol; the east stand hides
     # Edrin's separation without making him disappear in the open clearing.
-    tree = env.resize(woods['tree'], 2)
+    tree = asset_art.tree(1,(132,178))
     for foot in ((80, 220), (250, 340), (360, 250), (535, 275), (760, 220),
                  (910, 190), (1125, 290), (1175, 385), (1190, 520),
                  (220, 685), (510, 690), (740, 600), (960, 610)):

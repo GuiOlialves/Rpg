@@ -3,6 +3,7 @@ import math
 import random
 import pygame
 import environment as env
+from world import asset_art
 from entities.interactable import Interactable
 from entities.road_pursuer import spawn_road_enemy
 from systems.items import consumable
@@ -116,14 +117,14 @@ def build(load, opened_chests=None):
                 if a and g>r+12 and g>b+15:
                     result.set_at((x,y),(min(255,round(g*1.02)),round(g*.92),round(g*.49),a))
         return result
-    tree = env.resize(dry_leaves(woods["tree"]),2)
-    bush = env.resize(dry_leaves(woods["bush"]),2)
+    tree = asset_art.tree(0, (132,178), dry=True)
+    bush = asset_art.bush(0, (52,42), dry=True)
     rock = env.tint(env.resize(woods["rock"],2),(218,207,170))
     for i,foot in enumerate([(1870,710),(1840,990),(1700,705),(1665,940),
         (1490,535),(1535,850),(1435,915),(1180,595),(1145,815),(1020,590),
         (800,900),(675,680),(760,465),(1010,395),(1180,555),(1375,400),
         (1350,190),(1030,175),(730,360),(675,1020),(1480,1030)]):
-        place(tree,foot,(-10,-8,20,14),True,1)
+        place(asset_art.tree(i%5,(132,178),dry=True),foot,(-10,-8,20,14),True,1)
         if i%2==0: place(bush,(foot[0]+40,foot[1]+10),sway=1)
     for foot in [(1760,730),(1590,670),(1480,815),(1320,820),(1110,870),
                  (900,830),(720,615),(905,450),(1150,375),(1390,315),(1040,235)]:

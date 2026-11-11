@@ -31,6 +31,10 @@ from story.chapter1_return import Chapter1ReturnScene, interact_with_returned_al
 from story.old_road import moment_at, complete_clue, threatened
 from story import watchpost as post_story
 from story import edrin_encounter as edrin_story
+from story import namar as namar_story
+from story import archive as archive_story
+from story import chapter1_ending as ending_story
+from story import chapter2 as chapter2_story
 from story.story_manager import StoryManager
 from ui import defeat_screen as game_over
 from ui.character_menu import attribute_key_at
@@ -87,6 +91,10 @@ class Game:
         old_road_scene = None
         watchpost_scene = None
         edrin_scene = None
+        namar_scene = None
+        archive_scene = None
+        ending_scene = None
+        chapter2_scene = None
         prologue_end_card = False
         current_region = "home"
         region = build_region(current_region)
@@ -120,6 +128,15 @@ class Game:
                 quest_manager.notice_timer = 360
 
         def apply_story_region(region_id, story_region, region_enemies):
+            if region_id in chapter2_story.REGIONS:
+                if region_id in chapter2_story.DUNGEON_REGIONS: story.set('chapter2_part_b_started')
+                story.set({**chapter2_story.ENTER_FLAGS,'forgotten_route':'route_entered','encosta':'encosta_entered','threshold':'threshold_entered'}[region_id])
+            if region_id=='village' and story.get('archive_completed'):
+                story.set('chapter1_final_returned')
+            if region_id == 'archive':
+                story.set('archive_entered')
+            if region_id == 'namar':
+                story.set('namar_entered')
             if region_id == "pursuit":
                 story.set("pursuit_entered")
             if region_id == "watchpost":
@@ -133,6 +150,12 @@ class Game:
             if region_id == "village" and story.get("slime_quest_started"):
                 restore_resident(story_region, load("assets/npc/civilian_customer.png"))
             story.apply_to_region(story_region)
+            if region_id in chapter2_story.REGIONS:
+                return chapter2_story.spawn_pending(story_region,story,spawn_enemies,region_enemies)
+            if region_id == 'archive':
+                return archive_story.spawn_pending(story_region,story)
+            if region_id == 'namar':
+                return namar_story.spawn_pending(story_region, story, spawn_enemies)
             if (region_id == "forest" and story.get("blue_army_departed")
                     and not quest_manager.forest_event_started):
                 if story.get("red_insignia_found"):
@@ -156,7 +179,7 @@ class Game:
             nonlocal red_officer_scene, prologue_3c_scene, prologue_end_card
             nonlocal chapter1_return_scene
             nonlocal old_road_scene
-            nonlocal watchpost_scene, edrin_scene
+            nonlocal watchpost_scene, edrin_scene, namar_scene, archive_scene, ending_scene, chapter2_scene
             nonlocal area_transition, transition_fade
             if debug_session_active:
                 quest_manager.notice = "Load desativado durante checkpoints de debug."
@@ -193,6 +216,10 @@ class Game:
             old_road_scene = None
             watchpost_scene = None
             edrin_scene = None
+            namar_scene = None
+            archive_scene = None
+            ending_scene = None
+            chapter2_scene = None
             prologue_end_card = False
             area_transition = None
             transition_fade = FadeOverlay()
@@ -233,7 +260,7 @@ class Game:
             nonlocal prologue_end_card
             nonlocal chapter1_return_scene
             nonlocal old_road_scene
-            nonlocal watchpost_scene, edrin_scene
+            nonlocal watchpost_scene, edrin_scene, namar_scene, archive_scene, ending_scene, chapter2_scene
             preset = create_checkpoint(
                 checkpoint_id, load=load, build_region=build_region,
                 spawn_enemies=spawn_enemies, restore_resident=restore_resident,
@@ -259,6 +286,10 @@ class Game:
             old_road_scene = None
             watchpost_scene = None
             edrin_scene = None
+            namar_scene = None
+            archive_scene = None
+            ending_scene = None
+            chapter2_scene = None
             checkpoint_menu.checkpoint_id = checkpoint_id
             checkpoint_menu.close()
             debug_session_active = True
@@ -282,6 +313,20 @@ class Game:
                 story.apply_to_region(region)
                 region["spawn"]["village"] = (1460, 555)
                 enemies = []
+            elif current_region in chapter2_story.DUNGEON_REGIONS:
+                if current_region=='seal_core' and not story.get('lacre_custodian_defeated'):
+                    story.set('lacre_boss_wounded',False)
+                    story.set('lacre_anchor_left_broken',False); story.set('lacre_anchor_right_broken',False)
+                region=build_region(current_region);story.apply_to_region(region)
+                enemies=chapter2_story.spawn_pending(region,story,spawn_enemies)
+            elif current_region == 'archive':
+                region=build_region('archive')
+                story.apply_to_region(region)
+                enemies=archive_story.spawn_pending(region,story)
+            elif current_region == 'namar':
+                region = build_region('namar')
+                story.apply_to_region(region)
+                enemies = namar_story.spawn_pending(region, story, spawn_enemies)
             elif (current_region == "forest" and quest_manager.forest_event_started
                     and not quest_manager.forest_boss_defeated):
                 region, enemies = reset_forest_boss_encounter()
@@ -384,7 +429,7 @@ class Game:
                 elif area_transition["phase"] == "in" and not transition_fade.active:
                     source = area_transition["source"]
                     area_transition = None
-                    if source in {"old_road","watchpost","pursuit"} or current_region in {"old_road","watchpost","pursuit"}:
+                    if source in chapter2_story.REGIONS or current_region in chapter2_story.REGIONS or source in {"old_road","watchpost","pursuit",'namar','archive'} or current_region in {"old_road","watchpost","pursuit",'namar','archive'}:
                         autosave_pending = True
                     if (source == "home" and current_region == "village"
                             and story.get("house_searched")
@@ -451,6 +496,48 @@ class Game:
                         edrin_scene = None
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                         edrin_scene.advance()
+                    continue
+                if chapter2_scene is not None and chapter2_scene.active:
+                    if event.type==pygame.QUIT: running=False
+                    elif event.type==pygame.KEYDOWN:
+                        if event.key==pygame.K_e and hasattr(chapter2_scene,'advance'): chapter2_scene.advance()
+                        elif event.key in (pygame.K_1,pygame.K_2) and hasattr(chapter2_scene,'choose'):
+                            chapter2_scene.choose(0 if event.key==pygame.K_1 else 1)
+                        elif event.key==pygame.K_F4 and chapter2_scene.finish():
+                            autosave_pending=True
+                    continue
+                if ending_scene is not None and ending_scene.active:
+                    if event.type==pygame.QUIT: running=False
+                    elif event.type==pygame.KEYDOWN and event.key==pygame.K_F4:
+                        if ending_scene.finish():
+                            story.apply_to_region(region)
+                            ending_scene=None
+                        autosave_pending=True
+                    continue
+                if archive_scene is not None and archive_scene.active:
+                    if event.type == pygame.QUIT:
+                        running=False
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_e: archive_scene.advance()
+                        elif event.key == pygame.K_F4 and archive_scene.finish():
+                            enemies=archive_story.spawn_pending(region,story)
+                            autosave_pending=True
+                            archive_scene=None
+                    continue
+                if namar_scene is not None and namar_scene.active:
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.KEYDOWN:
+                        if event.key in (pygame.K_1, pygame.K_2):
+                            namar_scene.choose(0 if event.key == pygame.K_1 else 1)
+                        elif event.key == pygame.K_e:
+                            namar_scene.advance()
+                        elif event.key == pygame.K_F4:
+                            if namar_scene.finish():
+                                if namar_scene.phase == 'departure':
+                                    enemies = namar_story.spawn_pending(region, story, spawn_enemies)
+                                autosave_pending = True
+                                namar_scene = None
                     continue
                 if watchpost_scene is not None and watchpost_scene.active:
                     if event.type == pygame.QUIT:
@@ -611,10 +698,22 @@ class Game:
                         closing_target = dialogue.npc
                         quest_state = quest_manager.get("forest_trouble").state
                         closed = dialogue_system.advance(dialogue, quest_manager, inventory)
+                        if closed and current_region in chapter2_story.REGIONS:
+                            autosave_pending |= chapter2_story.complete_evidence(closing_target,story,inventory,player,quest_manager,region)
+                            story.apply_to_region(region)
+                        if closed and current_region in ('village','home'):
+                            autosave_pending |= ending_story.complete_evidence(closing_target,story,inventory)
+                            story.apply_to_region(region)
                         if closed and current_region == "old_road":
                             autosave_pending |= complete_clue(closing_target,story,region)
                         if closed and current_region == "pursuit":
                             autosave_pending |= edrin_story.complete_trace(closing_target,story)
+                        if closed and current_region == 'archive':
+                            autosave_pending |= archive_story.complete_evidence(closing_target,story,inventory)
+                            story.apply_to_region(region)
+                        if closed and current_region == 'namar':
+                            autosave_pending |= namar_story.complete_evidence(closing_target, story, inventory)
+                            story.apply_to_region(region)
                         if closed and current_region == "watchpost":
                             autosave_pending |= post_story.complete_evidence(
                                 closing_target,player,inventory,story,region,quest_manager)
@@ -628,6 +727,13 @@ class Game:
                             obj for obj in region.get("interactables", []) if not obj.opened]
                         target = nearest(targets, player, quest_manager)
                         if target is not None:
+                            region['live_enemies']=enemies
+                            handled,new_scene,changed=chapter2_story.interact(target,player,story,dialogue,quest_manager,inventory,region)
+                            if handled:
+                                chapter2_scene=new_scene
+                                autosave_pending |= changed
+                                story.apply_to_region(region)
+                                continue
                             if current_region == "watchpost":
                                 if post_story.threatened(player,enemies,region):
                                     quest_manager.notice = "Preciso afastar a ameaça antes de examinar isso."
@@ -656,12 +762,21 @@ class Game:
                                 insignia_memory_scene = InsigniaMemoryScene(
                                     player, target.image, dialogue, load)
                             elif current_region == "village" and target.uid == "alden":
-                                if story.get("chapter1_returned"):
+                                if story.get('archive_completed'):
+                                    if not story.get('chapter1_final_alden_talk'):
+                                        alden_scene=ending_story.FinalAldenScene(target,player,dialogue,region)
+                                    else:
+                                        target.face_player(player)
+                                        target.begin_interaction(dialogue,player,quest_manager)
+                                elif story.get("chapter1_returned"):
                                     alden_scene = interact_with_returned_alden(
                                         target, player, dialogue, story, region)
                                 else:
                                     alden_scene = interact_with_alden(
                                         target, player, dialogue, quest_manager, story)
+                            elif (current_region=='home' and target.uid=='chapter1_final_records'
+                                  and story.get('encosta_receipt_found') and not story.get('chapter1_completed')):
+                                ending_scene=ending_story.Chapter1EndingScene(player,story,quest_manager)
                             elif (current_region == "home" and target.uid == "broken_pendant"
                                   and story.get("house_investigation_unlocked")
                                   and not story.get("house_searched")):
@@ -729,6 +844,36 @@ class Game:
                 elif edrin_scene.autosave_requested:
                     autosave_pending = True
                     edrin_scene.autosave_requested = False
+            elif chapter2_scene is not None:
+                ended=chapter2_scene.update(delta_ms)
+                autosave_pending |= getattr(chapter2_scene,'autosave_requested',False) or ended
+                if hasattr(chapter2_scene,'autosave_requested'): chapter2_scene.autosave_requested=False
+                if ended or not chapter2_scene.active:
+                    story.apply_to_region(region)
+                    autosave_pending=True
+                    chapter2_scene=None
+            elif ending_scene is not None and ending_scene.active:
+                ended=ending_scene.update(delta_ms)
+                autosave_pending |= ending_scene.autosave_requested
+                ending_scene.autosave_requested=False
+                if ended:
+                    story.apply_to_region(region)
+                    ending_scene=None
+            elif archive_scene is not None and archive_scene.active:
+                ended=archive_scene.update(delta_ms)
+                autosave_pending |= archive_scene.autosave_requested
+                archive_scene.autosave_requested=False
+                if ended:
+                    enemies=archive_story.spawn_pending(region,story)
+                    archive_scene=None
+            elif namar_scene is not None and namar_scene.active:
+                ended = namar_scene.update(delta_ms)
+                autosave_pending |= namar_scene.autosave_requested
+                namar_scene.autosave_requested = False
+                if ended:
+                    if namar_scene.phase == 'departure':
+                        enemies = namar_story.spawn_pending(region, story, spawn_enemies)
+                    namar_scene = None
             elif watchpost_scene is not None and watchpost_scene.active:
                 if watchpost_scene.update(delta_ms,story,quest_manager):
                     autosave_pending = True
@@ -779,6 +924,12 @@ class Game:
                     player, current_region, region, enemies, drops, inventory,
                     quest_manager, hitstop_frames)
                 enemies, drops = combat_frame.enemies, combat_frame.drops
+                if current_region in chapter2_story.REGIONS:region['live_enemies']=enemies
+                autosave_pending |= chapter2_story.record_defeats(story,combat_frame.defeated_chapter2_enemies,region,quest_manager)
+                if current_region=='seal_core' and story.get('lacre_boss_wounded') and not region.get('phase_checkpoint_saved'):
+                    region['phase_checkpoint_saved']=True
+                    story.apply_to_region(region)
+                    autosave_pending=True
                 hitstop_frames = combat_frame.hitstop_frames
                 autosave_pending |= combat_frame.autosave_pending
                 for soldier_id in combat_frame.defeated_soldiers:
@@ -790,6 +941,13 @@ class Game:
                 for post_id in combat_frame.defeated_watchpost_enemies:
                     story.set(f"watchpost_enemy_{post_id}_defeated")
                     autosave_pending = True
+                for namar_id in combat_frame.defeated_namar_enemies:
+                    story.set(f'namar_enemy_{namar_id}_defeated')
+                    autosave_pending = True
+                if current_region == 'namar':
+                    autosave_pending |= namar_story.complete_combat(story, region)
+                if current_region == 'archive':
+                    autosave_pending |= archive_story.complete_combat(region,story,enemies)
                 for feedback in combat_frame.feedback:
                     damage_numbers.append(DamageNumber(
                         feedback.text, *feedback.position, feedback.color, feedback.critical))
@@ -845,12 +1003,18 @@ class Game:
                     watchpost_scene = post_story.moment_at(player,region,story,enemies,load)
                 if current_region == "pursuit" and player.hp > 0 and game_over_screen is None:
                     edrin_scene = edrin_story.encounter_at(player,region,story,dialogue,quest_manager,load)
+                if chapter2_scene is None and player.hp>0 and game_over_screen is None:
+                    chapter2_scene=chapter2_story.moment_at(player,story,dialogue,quest_manager,inventory,region)
+                if current_region == 'namar' and player.hp > 0 and game_over_screen is None:
+                    namar_scene = namar_story.moment_at(player,region,story,dialogue,quest_manager,inventory,load)
+                if current_region == 'archive' and player.hp > 0 and game_over_screen is None:
+                    archive_scene=archive_story.moment_at(player,region,story,dialogue,quest_manager,load)
                 for destination, exit_rect in (region["exits"].items()
-                                               if player.hp > 0 and old_road_scene is None and watchpost_scene is None and edrin_scene is None else ()):
+                                               if player.hp > 0 and old_road_scene is None and watchpost_scene is None and edrin_scene is None and namar_scene is None and archive_scene is None and chapter2_scene is None else ()):
                     if player.hitbox.colliderect(exit_rect):
                         if ((current_region,destination) in {("village","old_road"),
                                 ("old_road","village"),("old_road","watchpost"),("watchpost","old_road"),
-                                ("watchpost","pursuit"),("pursuit","watchpost")}):
+                                ("watchpost","pursuit"),("pursuit","watchpost"), ('pursuit','namar'), ('namar','pursuit'),('namar','archive'),('archive','namar')} or current_region in chapter2_story.REGIONS or destination in chapter2_story.REGIONS):
                             begin_area_transition(destination)
                             break
                         transition = self.world.transition(
@@ -889,6 +1053,8 @@ class Game:
                 except save_manager.SaveError:
                     quest_manager.notice, quest_manager.notice_timer = "Autosave falhou.", 180
             camera = camera_for(player, region["terrain"].get_size())
+            if current_region == 'archive' and region.get('boss_battle_active'):
+                camera=region['combat_camera']
             quest_manager.update()
             renderer.draw(
                 canvas, region=region, player=player, enemies=enemies, drops=drops,
@@ -907,6 +1073,9 @@ class Game:
                 chapter1_return_scene=chapter1_return_scene,
                 old_road_scene=old_road_scene,
                 watchpost_scene=watchpost_scene, edrin_scene=edrin_scene,
+                namar_scene=namar_scene,
+                archive_scene=archive_scene,
+                ending_scene=ending_scene, chapter2_scene=chapter2_scene,
                 prologue_end_card=prologue_end_card)
             if debug and not (chapter1_return_scene is not None and chapter1_return_scene.active):
                 draw_debug_overlay(
@@ -924,6 +1093,9 @@ class Game:
                         "chapter1_return_scene": chapter1_return_scene,
                         "old_road_scene": old_road_scene,
                         "watchpost_scene": watchpost_scene, "edrin_scene": edrin_scene,
+                        'namar_scene': namar_scene,
+                        'archive_scene':archive_scene,
+                        'ending_scene':ending_scene, 'chapter2_scene':chapter2_scene,
                     },
                     dialogue=dialogue, ui_mode=ui_mode,
                     transition_active=area_transition is not None,

@@ -90,8 +90,7 @@ def apply_state(region, story):
     edrin.visible = not story.get('edrin_escaped')
     region['npcs'] = [edrin] if edrin.visible else []
     if story.get('edrin_encounter_completed'):
-        # The next destination is deliberately not built in this block.
-        region['exits']['namar_future'] = pygame.Rect(1148, 515, 64, 92)
+        region['exits']['namar'] = pygame.Rect(1148, 515, 64, 92)
 
 
 def complete_trace(target, story):

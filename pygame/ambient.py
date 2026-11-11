@@ -15,7 +15,7 @@ def _prepare(region):
             waters.append((rng.randrange(rect.left,rect.right-22),rng.randrange(rect.top,rect.bottom),rng.random()*math.tau,zone['color']))
     centers={'forest':[(240,280),(580,470),(970,940),(1620,700)],
              'desert':[(490,700),(1420,850),(1830,360)],'village':[(780,480),(1200,896)],
-             'home':[]}.get(kind, [])
+             'home':[]}.get(kind, region.get('ambient_centers', []))
     particles=[]
     for cx,cy in centers:
         for i in range(3):
@@ -56,6 +56,11 @@ def draw(canvas,region,camera,ticks):
         if not view.collidepoint(px,py): continue
         alpha=round(math.sin(u*math.pi)*10)
         canvas.blit(data['frames'][alpha],(round(px-camera[0]),round(py-camera[1])))
+    for fx,fy in region.get('fires',()):
+        if not view.collidepoint(fx,fy): continue
+        x,y=round(fx-camera[0]),round(fy-camera[1]); flicker=round(math.sin(t*7+fx)*2)
+        pygame.draw.polygon(canvas,(158,100,61),[(x-3,y),(x+4,y),(x+2,y-8-flicker),(x,y-5),(x-2,y-10)])
+        pygame.draw.line(canvas,(218,179,104),(x,y),(x+1,y-5-flicker),2)
     if data['kind']=='village' and region.get('fountain_effect', True):
         x,y=1024-camera[0],512-camera[1]
         if canvas.get_rect().inflate(90,90).collidepoint(x,y):

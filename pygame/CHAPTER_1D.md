@@ -46,4 +46,4 @@ Cada trecho completo da conversa solicita autosave. Revelações são validadas 
 - `python -m unittest tests.test_watchpost tests.test_save_manager -v`: 21 testes da conexão do posto, investigação, combate existente e compatibilidade de Save/Load.
 - `python tools/review_edrin.py`: renderiza as 55 falas com o renderer do jogo. Previews em `tools/visual_checks/edrin/`: trilha, poses, oito cenas, storyboard, objetivo e GIF da conversa completa. O tempo de leitura do GIF é ilustrativo; no jogo, E controla as falas.
 
-O próximo bloco não foi iniciado.
+O próximo bloco não foi iniciado neste passe. Na continuação [1E — O Peso das Escolhas](CHAPTER_1E.md), a passagem indicada passa a conectar a trilha à Ponte de Namar.

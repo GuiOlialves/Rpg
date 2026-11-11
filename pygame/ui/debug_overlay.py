@@ -9,6 +9,16 @@ def _active(scene):
 
 
 def narrative_stage(region_id, story, quest):
+    if story.get('chapter2_started'):
+        return 'Capítulo II — As Vozes que Restaram'
+    if story.get("chapter1_completed"):
+        return "Capítulo I concluído — Ecos da Guerra"
+    if story.get("chapter1_final_returned"):
+        return "Capítulo 1G — Ecos do Passado"
+    if story.get("archive_entered"):
+        return "Capítulo 1F — A Ordem Esquecida"
+    if story.get("namar_entered"):
+        return "Capítulo 1E — O Peso das Escolhas"
     if story.get("pursuit_entered"):
         return "Capítulo 1D — O Homem que Deveria Estar Morto"
     if story.get("watchpost_entered"):
@@ -44,7 +54,8 @@ def narrative_stage(region_id, story, quest):
 def _scene_status(*, narrative, arrival_scene, alden_scene, house_memory_scene,
                   blue_march_scene, forest_ambush_scene, insignia_memory_scene,
                   red_officer_scene, transition_active, prologue_3c_scene=None,
-                  chapter1_return_scene=None, old_road_scene=None, watchpost_scene=None, edrin_scene=None):
+                  chapter1_return_scene=None, old_road_scene=None, watchpost_scene=None,
+                  edrin_scene=None, namar_scene=None, archive_scene=None, ending_scene=None, chapter2_scene=None):
     if narrative is not None and narrative.active:
         return f"opening_sequence {narrative.index + 1}/{len(narrative.beats)}", True
     scene_rows = (
@@ -60,6 +71,10 @@ def _scene_status(*, narrative, arrival_scene, alden_scene, house_memory_scene,
         (old_road_scene, lambda: f"old_road:{old_road_scene.kind}"),
         (watchpost_scene, lambda: f"watchpost:{watchpost_scene.kind}"),
         (edrin_scene, lambda: f"edrin:{edrin_scene.phase}"),
+        (namar_scene, lambda: f"namar:{namar_scene.phase}"),
+        (archive_scene, lambda: f"archive:{archive_scene.phase}"),
+        (ending_scene, lambda: f"chapter1_ending:{ending_scene.phase}"),
+        (chapter2_scene, lambda: f"chapter2:{chapter2_scene.phase}"),
     )
     for scene, label in scene_rows:
         if _active(scene):
@@ -114,6 +129,15 @@ def _entity_counts(region, enemies, *, blue_march_scene, forest_ambush_scene,
 
 
 def _story_flags(region_id, story):
+    if story.get('chapter2_started'):
+        names=('chapter2_started','chapter2_title_seen','route_entered','encosta_entered',
+               'encosta_investigated','echo_meal_seen','echo_departure_seen','echo_orders_seen',
+               'encosta_puzzle_solved','encosta_choice_shared','encosta_choice_kept',
+               'threshold_guard_defeated','chapter2_part_a_completed')
+        return [(name,str(story.get(name))) for name in names]
+    if story.get('archive_completed'):
+        from story.chapter1_ending import ENDING_FLAGS
+        return [(name, str(story.get(name))) for name in ENDING_FLAGS]
     if story.get('pursuit_entered'):
         names = ('edrin_met', 'edrin_name_known', 'edrin_death_revealed', 'edrin_authority_revealed',
                  'edrin_forgetting_revealed', 'edrin_encounter_completed')

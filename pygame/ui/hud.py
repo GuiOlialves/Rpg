@@ -15,6 +15,12 @@ MUTED = (167, 180, 180)
 ACCENT = (239, 205, 139)
 
 
+@lru_cache(maxsize=32)
+def cached_font(base_font, size):
+    """Reuse sizes within the caller's font lifetime, including after SDL reinit."""
+    return pygame.font.Font(None, size)
+
+
 @lru_cache(maxsize=64)
 def _panel_shadow(size, radius):
     shade = pygame.Surface(size, pygame.SRCALPHA)
@@ -62,7 +68,7 @@ def draw_bar(surface, rect, value, maximum, fill, label, font, icon=None):
             x = inner.x + inner.width * marker // 5
             pygame.draw.line(surface, (31, 39, 42),
                              (x, inner.y + 2), (x, inner.bottom - 2), 1)
-    compact = pygame.font.Font(None, max(14, min(18, rect.height - 4)))
+    compact = cached_font(font, max(14, min(18, rect.height - 4)))
     prefix = f"{icon}  " if icon else ""
     label_image = compact.render(f"{prefix}{label}", True, TEXT)
     value_image = compact.render(f"{value}/{maximum}", True, TEXT)
@@ -115,8 +121,8 @@ def _wrap_words(text, font, width, max_lines=2):
 
 def draw_objective_tracker(surface, text, font, title="OBJETIVO ATUAL"):
     """Present the current objective as a compact, labeled HUD card."""
-    small = pygame.font.Font(None, 17)
-    body = pygame.font.Font(None, max(18, font.get_height() - 2))
+    small = cached_font(font, 17)
+    body = cached_font(font, max(18, font.get_height() - 2))
     max_width = min(340, surface.get_width() - 42)
     lines = _wrap_words(text, body, max_width - 28, 2)
     panel_width = max(228, max(body.size(line)[0] for line in lines) + 28)
@@ -135,7 +141,7 @@ def draw_objective_tracker(surface, text, font, title="OBJETIVO ATUAL"):
 
 def draw_notice(surface, text, font):
     """Show quest/save notices as a short-lived toast, separate from the objective."""
-    small = pygame.font.Font(None, max(16, font.get_height() - 2))
+    small = cached_font(font, max(16, font.get_height() - 2))
     width = min(440, surface.get_width() - 32)
     lines = _wrap_words(text, small, width - 24, 2)
     panel = pygame.Rect(16, 54, width,
@@ -152,7 +158,7 @@ def draw_notice(surface, text, font):
 
 def draw_key_prompt(surface, text, font, center, top):
     """Render interaction prompts with a warm keycap and a quiet backing."""
-    small = pygame.font.Font(None, max(14, font.get_height() - 1))
+    small = cached_font(font, max(14, font.get_height() - 1))
     key = None
     action = str(text)
     if len(action) >= 4 and action.startswith("[") and action[2] == "]":
@@ -195,8 +201,8 @@ def draw_hud(canvas, player, font):
     pygame.draw.circle(panel, EDGE_LIGHT, (51, 56), 40, 1)
     pygame.draw.line(panel, (65, 79, 81), (100, 12), (100, 108), 1)
 
-    name_font = pygame.font.Font(None, 20)
-    level_font = pygame.font.Font(None, 16)
+    name_font = cached_font(font, 20)
+    level_font = cached_font(font, 16)
     panel.blit(name_font.render("AVENTUREIRO", True, ACCENT), (112, 10))
     level_badge = pygame.Rect(287, 8, 49, 22)
     pygame.draw.rect(panel, (45, 55, 58), level_badge, border_radius=4)

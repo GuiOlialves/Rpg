@@ -3,6 +3,7 @@ import math
 import random
 import pygame
 import environment as env
+from world import asset_art
 from entities.interactable import Interactable
 from story.blue_march import blue_commander_sprite, blue_troop_sprite, blue_fallen_sprite, BLUE_SIZES
 from story.forest_battle import prepare_red_contacts
@@ -29,17 +30,17 @@ def build(load):
     path_mask=env.paths(terrain,ROUTES,dirt,77,
         [((680,840),(260,150)),((1020,690),(225,135)),((470,190),(190,115))],grass_details)
     objects,nature,obstacles,scenery=[],[],[],[]
-    trunk=env.tint(env.resize(woods['tree'],3),(192,220,195))
-    groves=[trunk,pygame.transform.flip(trunk,True,False)]
-    sapling=env.tint(env.resize(woods['sapling'],2),(194,224,194))
-    bush=env.tint(env.resize(woods['bush'],1.5),(188,213,180))
+    trunk=asset_art.tree(2,(160,212))
+    groves=[asset_art.tree(i,(224,268)) for i in (0,1,2,3)]
+    sapling=asset_art.tree(1,(80,108))
+    bush=asset_art.bush(0,(54,44))
     # Every trunk carries its own footprint at the same depth as its artwork.
     for i,(x,y) in enumerate(TREES):
         box=pygame.Rect(x+14,y+52,25,16); obstacles.append(box)
         foot=box.center
         env.patch(terrain,foot,(245,125),(23,55,39,42),i)
         env.shadow(terrain,foot,100,26,42)
-        scenery.append(env.anchored(groves[i%2],foot,True,1,i))
+        scenery.append(env.anchored(groves[i%4],foot,True,1,i))
         if i%3!=1:
             scenery.append(env.anchored(sapling,(foot[0]-10,foot[1]-4),True,1,i+2))
         for j,(dx,dy) in enumerate(((-52,4),(-37,20),(44,-8),(56,12),(-16,28),(25,24))):

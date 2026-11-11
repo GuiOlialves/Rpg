@@ -8,6 +8,7 @@ class DialogueBox:
         self.npc = None
         self.manager = None
         self.index = 0
+        self.choices = ()
 
     @property
     def active(self):
@@ -15,9 +16,20 @@ class DialogueBox:
 
     def open(self, npc, manager=None):
         self.npc, self.index, self.manager = npc, 0, manager
+        self.choices = ()
+
+    def open_choices(self, npc, choices):
+        self.open(npc)
+        self.choices = tuple(choices)
+
+    def choose(self, index):
+        if not self.active or type(index) is not int or not 0 <= index < len(self.choices):
+            return False
+        self.npc, self.choices = None, ()
+        return True
 
     def advance(self):
-        if not self.active:
+        if not self.active or self.choices:
             return None
         lines = self.npc.dialogue_for("default", self.manager)
         if self.index + 1 < len(lines):
@@ -42,6 +54,8 @@ class DialogueBox:
         wrapped = _wrap(lines[self.index], font, width - 48)
         row_height = max(23, font.get_height() + 3)
         height = 76 + len(wrapped) * row_height
+        choice_rows = [(label, _wrap(detail, font, width - 70)) for label, detail in self.choices]
+        height += sum(32 + len(rows) * row_height for _label, rows in choice_rows)
         box = pygame.Rect((surface.get_width() - width) // 2,
                           surface.get_height() - height - 32, width, height)
         draw_panel(surface, box, fill=(20, 28, 34), border=(155, 127, 83),
@@ -55,6 +69,15 @@ class DialogueBox:
         for row, line in enumerate(wrapped):
             draw_veiled_text(surface, line, font, (239, 238, 225),
                              (box.x + 24, box.y + 46 + row * row_height))
+        choice_y = box.y + 46 + len(wrapped) * row_height + 5
+        for index, (label, rows) in enumerate(choice_rows):
+            draw_veiled_text(surface, f'[{index+1}] {label}', font, (240, 209, 151),
+                             (box.x + 24, choice_y))
+            for row, text in enumerate(rows):
+                draw_veiled_text(surface, text, font, (180, 191, 187),
+                                 (box.x + 42, choice_y + 24 + row * row_height))
+            choice_y += 32 + len(rows) * row_height
         continuing = self.index + 1 < len(lines) or getattr(self.npc, "scripted", False)
-        hint = "[E] continuar" if continuing else "[E] fechar"
-        draw_key_prompt(surface, hint, self.hint_font, box.right - 75, box.bottom - 28)
+        hint = '[1 / 2] escolher' if self.choices else '[E] continuar' if continuing else '[E] fechar'
+        draw_key_prompt(surface, hint, self.hint_font,
+                        box.centerx if self.choices else box.right - 75, box.bottom - 28)

@@ -17,6 +17,10 @@ from systems.quest import ACTIVE, AVAILABLE, COMPLETED, REWARDED, QuestManager
 from story.story_manager import StoryManager
 from story.watchpost import POST_FLAGS, MAIN_EVIDENCE
 from story.edrin_encounter import EDRIN_FLAGS, PHASE_FLAGS
+from story.namar import NAMAR_FLAGS, spawn_pending
+from story import archive as archive_story
+from story.chapter1_ending import ENDING_FLAGS
+from story import chapter2
 
 
 SAVE_VERSION = 1
@@ -26,7 +30,8 @@ if getattr(sys, "frozen", False):
     SAVE_PATH = Path(sys.executable).with_name("savegame.json")
 else:
     SAVE_PATH = Path(__file__).with_name("savegame.json")
-REGIONS = {"home", "village", "forest", "desert", "old_road", "watchpost", "pursuit"}
+REGIONS = {"home", "village", "forest", "desert", "old_road", "watchpost", "pursuit", "namar",'archive'}
+REGIONS.update(chapter2.REGIONS)
 CHESTS = {"desert_chest_oasis", "desert_chest_ruins", "desert_chest_hidden"}
 CHESTS |= {"road_chest_turnout", "road_chest_shelter", "road_chest_caravan"}
 STATS = ("vitalidade", "força", "magia", "agilidade")
@@ -38,7 +43,13 @@ SAFE_SPAWNS = {
     "old_road": ((1910, 850), (1810, 850)),
     "watchpost": ((768,914), (1260,765)),
     "pursuit": ((110,600), (830,400)),
+    'namar': ((120,825), (730,655), (1030,340), (595,800)),
+    'archive': ((246,862),(715,745),(915,345),(360,640)),
+    'forgotten_route': ((120,950),(1760,610),(1930,240)),
+    'encosta': ((120,910),(860,760),(1565,100)),
+    'threshold': ((430,1030),(1000,820),(1450,685)),
 }
+SAFE_SPAWNS.update({r:((1024,940),(1024,880),(900,920)) for r in chapter2.DUNGEON_REGIONS})
 
 
 class SaveError(Exception):
@@ -197,7 +208,7 @@ def validate(data):
     }
     # New optional flags default to False through StoryManager.get(), keeping
     # the existing prologue/legacy save shape until the conversation completes.
-    known_flags = set(story_defaults) | set(POST_FLAGS) | set(EDRIN_FLAGS) | {
+    known_flags = set(story_defaults) | set(POST_FLAGS) | set(EDRIN_FLAGS) | set(NAMAR_FLAGS) | set(archive_story.ARCHIVE_FLAGS) | set(ENDING_FLAGS) | set(chapter2.ALL_FLAGS) | {
         "alden_post_slimes_talk", "house_investigation_unlocked",
         "pendant_found", "house_searched",
         "blue_army_departed",
@@ -307,6 +318,64 @@ def validate(data):
             if not story.get(prerequisite, False) or not all(story.get(f, False) for f in flags):
                 raise SaveError('Save inválido: revelações de Edrin fora de ordem.')
         prerequisite = flags[-1]
+    if story.get('namar_entered', False) and not story.get('edrin_encounter_completed', False):
+        raise SaveError('Save inválido: Namar antes do encontro com Edrin.')
+    if ((region_id == 'namar' or any(story.get(f, False) for f in NAMAR_FLAGS[1:]))
+            and not story.get('namar_entered', False)):
+        raise SaveError('Save inválido: acontecimentos de Namar antes da chegada.')
+    protect, pursue = story.get('namar_choice_protect', False), story.get('namar_choice_pursue', False)
+    if protect and pursue:
+        raise SaveError('Save inválido: prioridades incompatíveis em Namar.')
+    if story.get('namar_survivors_met', False) and not all(story.get(f, False) for f in
+            ('namar_military_clue', 'namar_civilian_clue')):
+        raise SaveError('Save inválido: conflito antes de investigar Namar.')
+    if (protect or pursue) and not story.get('namar_survivors_met', False):
+        raise SaveError('Save inválido: escolha antes do encontro com os sobreviventes.')
+    if story.get('namar_supplies_lost', False) != pursue:
+        raise SaveError('Save inválido: carga inconsistente com a prioridade escolhida.')
+    if any(story.get(f'namar_enemy_{i}_defeated', False) for i in range(2)) and not (protect or pursue):
+        raise SaveError('Save inválido: confronto antes de escolher uma prioridade.')
+    if story.get('namar_combat_completed', False) and not all(story.get(f'namar_enemy_{i}_defeated', False) for i in range(2)):
+        raise SaveError('Save inválido: confronto de Namar incompleto.')
+    if story.get('namar_dispatch_detail', False) and not (pursue and story.get('namar_combat_completed', False)):
+        raise SaveError('Save inválido: referência do portador sem interceptá-lo.')
+    if story.get('namar_aftermath_seen', False) and not (story.get('namar_combat_completed', False)
+            and (protect or story.get('namar_dispatch_detail', False))):
+        raise SaveError('Save inválido: consequências antes de resolver o confronto.')
+    if story.get('namar_memory_seen', False) and not story.get('namar_aftermath_seen', False):
+        raise SaveError('Save inválido: memória de Namar antes das consequências.')
+    lead, completed = story.get('namar_record_lead_found', False), story.get('namar_completed', False)
+    if lead != completed or (completed and not story.get('namar_memory_seen', False)):
+        raise SaveError('Save inválido: destino do registro antes da memória de Namar.')
+    if story.get('archive_entered') and not completed:
+        raise SaveError('Save inválido: depósito antes da pista de Namar.')
+    if ((region_id == 'archive' or any(story.get(f) for f in archive_story.ARCHIVE_FLAGS[1:]))
+            and not story.get('archive_entered')):
+        raise SaveError('Save inválido: registros antes de entrar no depósito.')
+    if story.get('archive_confrontation_started') and not all(story.get(f) for f in
+            ('archive_defense_report','archive_petition')):
+        raise SaveError('Save inválido: confronto antes das duas versões da retirada.')
+    prerequisite='archive_confrontation_started'
+    for flag in ('archive_veteran_defeated','archive_order_obtained','archive_memory_seen',
+                 'archive_forgetting_record','archive_completed'):
+        if story.get(flag) and not story.get(prerequisite):
+            raise SaveError('Save inválido: revelações do depósito fora de ordem.')
+        prerequisite=flag
+    if bool(story.get('archive_order_obtained')) != ('namar_order_copy' in inventory_ids):
+        raise SaveError('Save inválido: segunda via inconsistente com os documentos obtidos.')
+    prerequisite='archive_completed'
+    for flag in ('chapter1_final_returned','chapter1_final_alden_talk','encosta_receipt_found',
+                 'chapter1_final_memory_seen','chapter1_final_reflection_seen','chapter1_completed'):
+        if story.get(flag) and not story.get(prerequisite):
+            raise SaveError('Save inválido: encerramento do capítulo fora de ordem.')
+        prerequisite=flag
+    if story.get('chapter1_consequences_seen') and not story.get('chapter1_final_returned'):
+        raise SaveError('Save inválido: consequências antes do retorno ao Vale.')
+    if bool(story.get('encosta_receipt_found')) != bool(story.get('encosta_destination_known')):
+        raise SaveError('Save inválido: destino sem recibo correspondente.')
+    if bool(story.get('encosta_receipt_found')) != ('encosta_receipt' in inventory_ids):
+        raise SaveError('Save inválido: recibo inconsistente com o inventário.')
+    chapter2.validate(story,inventory_ids,data['region'],SaveError)
     data["story"] = story
     return data
 
@@ -452,6 +521,14 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
         enemies = [enemy for enemy in enemies if not story.get(f"road_enemy_{enemy.road_id}_defeated")]
     elif region_id == "watchpost":
         enemies = [enemy for enemy in enemies if not story.get(f"watchpost_enemy_{enemy.watchpost_id}_defeated")]
+    elif region_id == 'namar':
+        enemies = spawn_pending(region, story, spawn_enemies)
+    elif region_id == 'archive':
+        enemies = archive_story.spawn_pending(region,story)
+        if region.get('boss_battle_active'):
+            region['spawn']['namar']=(715,745)
+    elif region_id in chapter2.REGIONS:
+        enemies=chapter2.spawn_pending(region,story,spawn_enemies,enemies)
     if (region_id == "forest" and story.get("blue_army_departed")
             and not quests.forest_event_started):
         enemies = []
@@ -461,6 +538,9 @@ def load_game(path, player_factory, build_region, spawn_enemies, guardian_factor
             from core.assets import load
             enemies = spawn_red_group(progress // 2, region, load, story)
     player.x, player.y = _safe_position(tuple(character["position"]), region_id, region, enemies)
+    if region_id == 'archive' and region.get('boss_battle_active'):
+        if not pygame.Rect(600,430,580,410).collidepoint(player.x,player.y):
+            player.x,player.y=715,745
     drops = [Drop(consumable(entry["id"], entry["amount"]), *entry["position"], entry["lifetime"])
              for entry in data["drops"]]
     return LoadedGame(player, inventory, quests, region_id, region, enemies, drops,

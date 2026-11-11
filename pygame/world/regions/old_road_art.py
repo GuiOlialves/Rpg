@@ -1,5 +1,6 @@
 """Small authored pixel props for the abandoned route; integer world scale."""
 import pygame
+from world import asset_art
 
 INK = (45, 44, 40)
 WOOD = (117, 84, 55)
@@ -10,6 +11,8 @@ PALE = (157, 154, 132)
 
 def prop(kind):
     size = (96, 108) if kind == "watchpost" else (64, 42) if kind == "cart" else (40, 28)
+    replacement = asset_art.prop('road', kind, (size[0]*2,size[1]*2))
+    if replacement is not None: return replacement
     im = pygame.Surface(size, pygame.SRCALPHA)
     def rect(color, box): pygame.draw.rect(im, color, box)
     def line(color, a, b, width=1): pygame.draw.line(im, color, a, b, width)

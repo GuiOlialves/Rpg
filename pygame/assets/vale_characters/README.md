@@ -53,3 +53,15 @@ O segundo passe foi feito em etapas: base/rosto/idle/passos → espada/ataque �
 O ajuste final do ataque ao sul usa um corte lateral baixo: esquerda → arco frontal → direita, com empunhadura na cintura, rotação discreta de ombros/tronco e pés apoiados. Comprimento, duração e janela ativa permanecem iguais; slash e máscara seguem o mesmo arco. A comparação, trajetória e repetição nas quatro direções ficam em `tools/visual_checks/front_sword_cut/`, geradas por `python tools/review_front_sword_cut.py`.
 
 Limites: são as quatro direções cardinais existentes; o projétil do batedor representa o ataque instantâneo original, sem adicionar física. Não foi feito playtest manual de todo o prólogo. Os props Tiny Swords do campo de batalha continuam reutilizados. História, mapas, inventário, progressão e formato de save permanecem fora das alterações.
+
+
+## Encosta — Capítulo II / A
+
+`tools/draw_encosta_cast.py` gera 22 folhas próprias. Inês e Breno mantêm frames 32×32, quatro direções, idle de quatro poses e passos de oito. Predador dos juncos, couraça de ardósia e vigia territorial usam frames 80×40, pivô horizontal 40 e pés na linha 36. O padding acomoda cauda, focinho e investida sem alterar a escala do corpo; o desenho é exibido em 2× inteiro. Cada criatura tem idle (4), passos (8), preparação (3), ataque (8), dano (3) e derrota (4), nas quatro direções. O slicing e os flashes são preparados em cache. O gerador não altera nenhuma folha anterior.
+
+`python tools/review_chapter2.py` registra mapas, diálogos, escolha, as quatro ressonâncias completas, ataques e abertura/encerramento em `tools/visual_checks/chapter2/`. Consulte `CHAPTER_2A.md` para gameplay, persistência e limitações.
+
+
+## Câmara dos Testemunhos — Capítulo II / B
+
+`python tools/draw_lacre_cast.py` gera somente as 40 novas folhas dos defensores da Câmara: guardião, eco, Vigia e Iriel. Células 80×64, pivot horizontal 40, pés 46, escala 2× inteira. Idle (4), passos (8), preparação (4), corte/arco/investida (8 cada), dano (3), queda (6), transição (6), em quatro direções. A geometria compartilhada de poses mantém 23 pixels da empunhadura à ponta, sem girar o sprite inteiro. Os atlases anteriores permanecem intactos. `tools/review_lacre.py` captura os setores e sequências completas com o renderer do jogo. Regras e limites em `CHAPTER_2B.md`.

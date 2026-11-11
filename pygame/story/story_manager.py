@@ -50,6 +50,42 @@ class StoryManager:
 
     @property
     def objective_text(self):
+        if self.get('chapter2_started'):
+            from story.chapter2 import objective
+            return objective(self)
+        if self.get('chapter1_completed'):
+            return 'Fale com Alden antes de seguir ao Posto de Convalescença da Encosta.'
+        if self.get('encosta_receipt_found'):
+            return 'Volte à sua casa e examine R-17 junto da segunda via.'
+        if self.get('chapter1_final_alden_talk'):
+            return 'Confira o recibo no livro de recebimento que Alden abriu.'
+        if self.get('chapter1_final_returned'):
+            return 'Converse com Alden sobre a ordem de Namar.'
+        if self.get('archive_completed'):
+            return 'Volte ao Vale com a segunda via e procure Alden.'
+        if self.get('archive_memory_seen'):
+            return 'Examine a ficha chamuscada anexada à ordem.'
+        if self.get('archive_order_obtained'):
+            return 'Reconheça a decisão registrada na segunda via.'
+        if self.get('archive_veteran_defeated'):
+            return 'Abra a Gaveta 7 na sala seca do depósito.'
+        if self.get('archive_confrontation_started'):
+            return 'Desarme Soren para alcançar os registros.'
+        if self.get('archive_entered'):
+            return ('Avance pelo pátio de triagem até a sala seca.' if self.get('archive_defense_report')
+                    and self.get('archive_petition') else 'Investigue os papéis queimados e as duas versões da retirada.')
+        if self.get('namar_completed'):
+            return 'Encontre a segunda via da ordem de Namar no Depósito de Registros da Margem Seca.'
+        if self.get('namar_combat_completed'):
+            return ('Alcance o portador no pedágio.' if self.get('namar_choice_pursue')
+                    and not self.get('namar_dispatch_detail') else 'Volte até Mara e Téo.')
+        if self.get('namar_choice_protect'):
+            return 'Defenda a carroça de Mara e Téo.'
+        if self.get('namar_choice_pursue'):
+            return 'Afaste os guardas e alcance o portador pelo pedágio.'
+        if self.get('namar_entered'):
+            return ('Encontre Mara e Téo junto à carroça.' if self.get('namar_military_clue')
+                    and self.get('namar_civilian_clue') else 'Investigue a casa de pedágio e as ruínas da padaria.')
         if self.get("edrin_encounter_completed"):
             return "Descubra o que aconteceu na Ponte de Namar."
         if self.get("watchpost_trail_found"):
@@ -74,6 +110,8 @@ class StoryManager:
 
     @property
     def objective_title(self):
+        if self.get('chapter2_started'): return 'O PREÇO DA MEMÓRIA'
+        if self.get('chapter1_completed'): return 'PRÓXIMA PISTA'
         return "Ecos da Guerra" if self.get("chapter1_returned") else "OBJETIVO ATUAL"
 
     @property
@@ -87,6 +125,13 @@ class StoryManager:
                 and self.get("red_insignia_found"))
 
     def apply_to_region(self, region):
+        if self.get('archive_completed'):
+            from story.chapter1_ending import apply_state
+            from core.assets import load
+            apply_state(region,self,load)
+        if self.get('chapter1_completed'):
+            from story.chapter2 import apply_state
+            apply_state(region,self)
         if region.get("ambient_kind") == "home":
             region["story_phase"] = self.home_phase
             if self.get("house_investigation_unlocked"):
@@ -113,6 +158,14 @@ class StoryManager:
 
         elif region.get("ambient_kind") == "pursuit":
             from story.edrin_encounter import apply_state
+            apply_state(region, self)
+
+        elif region.get('ambient_kind') == 'namar':
+            from story.namar import apply_state
+            apply_state(region, self)
+
+        elif region.get('ambient_kind') == 'archive':
+            from story.archive import apply_state
             apply_state(region, self)
 
         elif region.get("ambient_kind") == "watchpost":

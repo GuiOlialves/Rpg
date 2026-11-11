@@ -24,7 +24,7 @@ def _wrap(text, font, max_width):
     return lines or [""]
 
 
-def draw_narrative(canvas, sequence, world_renderer=None):
+def draw_narrative(canvas, sequence, world_renderer=None, font=None):
     beat = sequence.current
     if beat is None:
         return
@@ -40,7 +40,11 @@ def draw_narrative(canvas, sequence, world_renderer=None):
         draw_letterbox(canvas)
 
     if beat.text:
-        font = pygame.font.Font(None, 38 if not world_backdrop else 30)
+        size=38 if not world_backdrop else 30
+        if font is None:font=pygame.font.Font(None,size)
+        else:
+            from ui.hud import cached_font
+            font=cached_font(font,size)
         wrapped = _wrap(beat.text, font, canvas.get_width() - 112)
         line_height = font.get_height() + 3
         text_height = len(wrapped) * line_height - 3

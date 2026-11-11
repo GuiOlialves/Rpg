@@ -8,3 +8,5 @@ EQUIPMENT = {
 
 def item(item_id):
     return dict(EQUIPMENT[item_id], bonuses=dict(EQUIPMENT[item_id]["bonuses"]))
+
+EQUIPMENT["custody_medallion"]={"id":"custody_medallion","name":"Medalhão de Custódia","type":"equipment","slot":"Acessório","description":"Peça de ligação retirada do núcleo. Mantém a orientação entre ecos: +1 Vitalidade e +1 Magia. Troca o acessório equipado, sem acumular seu bônus.","bonuses":{"vitalidade":1,"magia":1},"color":(170,148,99)}

@@ -159,7 +159,8 @@ class EdrinTests(unittest.TestCase):
         self.assertTrue(all(witnessed.values()))
         self.assertEqual(self.p.story.objective_title, 'Ecos da Guerra')
         self.assertEqual(self.p.story.objective_text, 'Descubra o que aconteceu na Ponte de Namar.')
-        self.assertNotIn('namar', self.world.region_ids)
+        self.assertIn('namar', self.world.region_ids)
+        self.assertIn('namar', self.p.region['exits'])
         self.assertEqual(self.world.spawn_enemies(self.p.region), [])
         self.assertTrue(all(self.p.story.get(f) for f in encounter.EDRIN_FLAGS if f != 'pursuit_trace_found'))
         self.assertIsNone(encounter.encounter_at(self.p.player, self.p.region, self.p.story,

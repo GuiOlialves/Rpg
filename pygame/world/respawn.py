@@ -3,7 +3,14 @@ import pygame
 from core.config import RESPAWN_IFRAMES
 
 def safe_respawn_position(region_id, region, enemies):
-    source = {"forest": "village", "desert": "forest", "old_road": "village", "watchpost":"old_road", "pursuit":"watchpost"}.get(region_id)
+    if region_id=='forgotten_route' and region.get('rest_checkpoint'):
+        return (1760.,610.)
+    if region.get("dungeon_checkpoint"):
+        return tuple(map(float,region["dungeon_checkpoint"]))
+    source = {"forest": "village", "desert": "forest", "old_road": "village", "watchpost":"old_road", "pursuit":"watchpost", "namar":"pursuit",'archive':'namar',
+              'forgotten_route':'village','encosta':'forgotten_route','threshold':'encosta'}.get(region_id)
+    if region_id == 'archive' and region.get('boss_battle_active'):
+        return (715.,745.)
     default = (512, 288) if region_id == "home" else (1024, 576)
     preferred = region.get("spawn", {}).get(source, default) if source else default
     candidates = [preferred]

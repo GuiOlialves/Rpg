@@ -1,6 +1,7 @@
 """Authored cutaway masonry and small pixel props for the road watchpost."""
 import random
 import pygame
+from world import asset_art
 
 INK = (38, 39, 38)
 STONE = (111, 112, 103)
@@ -28,29 +29,16 @@ def wall(width, seed=0):
 
 
 def floor(terrain, rect, *, wooden=False, seed=0):
-    rng = random.Random(seed)
-    pygame.draw.rect(terrain, (42, 42, 37), rect.inflate(6, 6))
-    base = (108, 86, 62) if wooden else (117, 116, 101)
-    pygame.draw.rect(terrain, base, rect)
-    for y in range(rect.top, rect.bottom, 18 if wooden else 28):
-        pygame.draw.line(terrain, (73, 62, 47) if wooden else (79, 82, 74),
-                         (rect.left, y), (rect.right - 1, y), 2)
-        for x in range(rect.left + (12 if y // 28 % 2 else 0), rect.right, 56):
-            pygame.draw.line(terrain, (77, 69, 52) if wooden else (91, 92, 80),
-                             (x, y + 2), (x, min(rect.bottom - 1, y + (15 if wooden else 25))), 2)
-    for _ in range(rect.width * rect.height // 260):
-        x, y = rng.randrange(rect.left, rect.right), rng.randrange(rect.top, rect.bottom)
-        pygame.draw.line(terrain, tuple(c + rng.choice((-10, 9)) for c in base), (x, y), (x + 4, y), 2)
-    # Dust accumulates against walls; the central circulation stays legible.
-    for edge in (pygame.Rect(rect.x, rect.y, rect.width, 8),
-                 pygame.Rect(rect.x, rect.y, 8, rect.height)):
-        pygame.draw.rect(terrain, (87, 85, 65), edge)
+    asset_art.floor(terrain, rect, wooden=wooden, seed=seed)
 
 
 def prop(kind):
     sizes = {"desk": (70, 44), "bed": (34, 42), "locker": (32, 40),
              "gate": (68, 54), "breach": (38, 40), "postern": (32, 44), "closed_postern": (32,44),
              "flag": (34, 58), "shelf": (50, 42), "chair": (28, 32)}
+    size=sizes.get(kind,(32,28))
+    replacement=asset_art.prop('post',kind,(size[0]*2,size[1]*2))
+    if replacement is not None: return replacement
     im = pygame.Surface(sizes.get(kind, (32, 28)), pygame.SRCALPHA)
     def rect(c, b): pygame.draw.rect(im, c, b)
     def line(c, a, b, w=1): pygame.draw.line(im, c, a, b, w)

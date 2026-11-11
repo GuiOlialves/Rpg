@@ -2,6 +2,7 @@
 import random
 import pygame
 import environment as env
+from world import asset_art
 from core.config import WORLD
 from entities.interactable import Interactable
 from entities.npc import NPC
@@ -135,7 +136,7 @@ def build(asset, flowerbed, sign, load):
                       (170,980),(240,1020),(350,995), (650,1005),(745,1035),
                       (1180,1010),(1270,1040), (1620,1010),(1720,970),(1830,1030)]
     for i, pos in enumerate(tree_positions):
-        im = tree_sprite
+        im = asset_art.tree(i%4,(112,148)) if i%3==0 else tree_sprite
         nature.append((im, (pos[0]+49-im.width//2,pos[1]+118-im.height)))
         obstacles.append(pygame.Rect(pos[0] + 40, pos[1] + 108, 18, 10))
         if i % 2 == 0:
@@ -200,7 +201,7 @@ def build_playable(load):
         "fountain_effect": False,
         "obstacles": obstacles,
         "exits": {"forest": pygame.Rect(1960, 520, 88, 115)},
-        "spawn": {"forest": (1850, 575), "home": (540, 490), "old_road": (128,575)},
+        "spawn": {"forest": (1850, 575), "home": (540, 490), "old_road": (128,575),'archive':(1840,610)},
         "enemy_spawns": [], "npcs": npcs, "interactables": [entry],
         "old_road_marker": old_road_marker,
     }

@@ -4,7 +4,7 @@ import ambient
 import environment
 from core.config import VIEW
 from entities.npc import nearest
-from ui.hud import draw_key_prompt, draw_panel
+from ui.hud import draw_key_prompt, draw_panel, cached_font
 
 _DEBUG_LABEL_FONT = None
 
@@ -55,6 +55,14 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
         else:
             canvas.blit(image, (pos[0] - camera[0], pos[1] - camera[1]))
     ambient.draw(canvas,region,camera,pygame.time.get_ticks())
+    # Small warm brackets identify available echoes, below the dialogue/HUD.
+    for obj in region.get('interactables',()):
+        if getattr(obj,'resonance',False) and obj.enabled:
+            x,y=round(obj.x-camera[0]),round(obj.y-camera[1])
+            if canvas.get_rect().collidepoint(x,y):
+                for sign in (-1,1):
+                    pygame.draw.lines(canvas,(174,164,128),False,
+                        [(x+sign*19,y+7),(x+sign*23,y+3),(x+sign*23,y-3)],1)
     if region.get("lighting") is not None:
         canvas.blit(region["lighting"], (-camera[0], -camera[1]))
     if debug:
@@ -199,7 +207,8 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
             label = ("ANTIGA ESTRADA" if exit_name in {"old_road","old_road_future"} else
                      "POSTO DE VIGIA" if exit_name in {"watchpost","watchpost_future"} else
                      "TRILHA RECENTE" if exit_name == "pursuit" else
-                     "PONTE DE NAMAR" if exit_name == "namar_future" else
+                     "PONTE DE NAMAR" if exit_name in {"namar", "namar_future"} else
+                     'DEPÓSITO DE REGISTROS' if exit_name == 'archive' else
                      "FLORESTA" if exit_name == "forest" else "VILA" if exit_name == "village" else "DESERTO" if exit_name == "desert" else "RUÍNAS")
             draw_key_prompt(canvas, f"Saída: {label}", font,
                             exit_rect.centerx - camera[0],
@@ -236,16 +245,17 @@ def draw_world(canvas, region, font, camera, player=None, enemies=None, drops=No
 def draw_region_banner(canvas, region, font):
     panel_rect = pygame.Rect(16, 12, 842, 36)
     draw_panel(canvas, panel_rect, fill=(24, 33, 39), radius=6, shadow=True)
-    name_font = pygame.font.Font(None, 22)
-    controls_font = pygame.font.Font(None, 17)
+    name_font = cached_font(font, 22)
+    controls_font = cached_font(font, 17)
     name = name_font.render(region["name"].upper(), True, (239, 205, 139))
     canvas.blit(name, (panel_rect.x + 12,
                        panel_rect.centery - name.get_height() // 2))
     divider_x = panel_rect.x + 18 + name.get_width()
     pygame.draw.line(canvas, (77, 91, 93), (divider_x, panel_rect.y + 8),
                      (divider_x, panel_rect.bottom - 8), 1)
-    controls = controls_font.render(
-        "WASD mover   ·   Espaço atacar   ·   Q dash   ·   E interagir   ·   V personagem   ·   I inventário",
-        True, (182, 193, 190))
+    controls_text = "WASD mover   ·   Espaço atacar   ·   Q dash   ·   E interagir   ·   V personagem   ·   I inventário"
+    if controls_font.size(controls_text)[0] > panel_rect.right - divider_x - 24:
+        controls_text = "WASD mover · Espaço atacar · Q dash · E interagir · V/I menus"
+    controls = controls_font.render(controls_text, True, (182, 193, 190))
     canvas.blit(controls, (divider_x + 12,
                            panel_rect.centery - controls.get_height() // 2))

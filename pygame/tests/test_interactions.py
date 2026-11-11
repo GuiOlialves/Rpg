@@ -68,7 +68,7 @@ class InteractionTests(unittest.TestCase):
 
         def move_between_examinables(player, keys, obstacles):
             movement_frames[0] += 1
-            positions = {1: (100, 222), 2: (900, 238), 3: (512, 470)}
+            positions = {1: (339, 238), 2: (705, 238), 3: (512, 470)}
             if movement_frames[0] in positions:
                 player.x, player.y = positions[movement_frames[0]]
 
@@ -180,6 +180,7 @@ class InteractionTests(unittest.TestCase):
         self.assertFalse(any(hitbox.colliderect(exit_rect) for exit_rect in village["exits"].values()))
 
     def test_player_can_walk_house_and_reach_each_interaction_without_crossing_solid_objects(self):
+        from collections import deque
         home = main.build_region("home")
         player = main.Player(main.load("assets/player/f_player_sheet.png"),
                              main.load("assets/player/f_player_attack_sheet.png"))
@@ -197,32 +198,41 @@ class InteractionTests(unittest.TestCase):
             keys.active = key
             for _ in range(frames):
                 player.update(keys, home["obstacles"])
+                self.assertFalse(any(player.hitbox.colliderect(o) for o in home['obstacles']))
 
         walk(pygame.K_s, 20)
         self.assertGreater(player.y, 288)
-        walk(pygame.K_w, 60)
-        self.assertGreaterEqual(player.y, 231)
-        self.assertFalse(player.hitbox.colliderect(pygame.Rect(464, 188, 96, 34)))
+        walk(pygame.K_w, 200)
+        self.assertGreaterEqual(player.y, 121)
+        before = player.y
+        walk(pygame.K_w, 5)
+        self.assertEqual(player.y, before)
 
-        walk(pygame.K_s, 20)
-        walk(pygame.K_a, 25)
-        walk(pygame.K_w, 12)
-        walk(pygame.K_a, 44)
-        walk(pygame.K_a, 65)
-        mirror, sword, door = home["interactables"]
-        self.assertIs(nearest([mirror], player), mirror)
-
-        player.x, player.y = 300, 260
-        walk(pygame.K_w, 100)
-        self.assertLessEqual(player.y, 51)
-        player.x, player.y = 320, 269
-        walk(pygame.K_d, 180)
-        self.assertIs(nearest([sword], player), sword)
-        walk(pygame.K_a, 12)
-        walk(pygame.K_a, 30)
-        walk(pygame.K_s, 100)
-        walk(pygame.K_a, 65)
-        self.assertIs(nearest([door], player), door)
+        # Search the furnished layout, then actually walk each route. This
+        # checks reachability without relying on coordinates from the old room.
+        player.x, player.y = 512, 288
+        player.speed = 3
+        directions = ((3,0,pygame.K_d),(-3,0,pygame.K_a),
+                      (0,3,pygame.K_s),(0,-3,pygame.K_w))
+        for target in home['interactables']:
+            start = (round(player.x), round(player.y))
+            queue = deque([start]); parents = {start: None}; goal = None
+            while queue:
+                point = queue.popleft()
+                if ((point[0]-target.x)**2+(point[1]-target.y)**2
+                        <= (target.interaction_radius-3)**2):
+                    goal = point; break
+                for dx,dy,key in directions:
+                    dest = (point[0]+dx,point[1]+dy)
+                    box = pygame.Rect(dest[0]-13,dest[1]-9,26,18)
+                    if dest not in parents and not any(box.colliderect(o) for o in home['obstacles']):
+                        parents[dest] = (point,key); queue.append(dest)
+            self.assertIsNotNone(goal, target.uid)
+            route = []
+            while parents[goal] is not None:
+                goal,key = parents[goal]; route.append(key)
+            for key in reversed(route): walk(key,1)
+            self.assertIs(nearest([target],player),target)
 
 
 if __name__ == "__main__":

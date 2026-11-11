@@ -1,6 +1,6 @@
 # O Vale — RPG em Pygame
 
-**Versão 0.33** · RPG 2D top-down desenvolvido em Python com Pygame CE.
+**Versão 0.34** · RPG 2D top-down desenvolvido em Python com Pygame CE.
 
 Veja o [histórico de atualizações](CHANGELOG.md) para um resumo breve de cada versão.
 
@@ -8,14 +8,16 @@ O jogo reúne exploração, combate e progressão em três áreas conectadas: Vi
 
 ### Estado atual
 
-O Prólogo — O Nome que Falta está completo até o encerramento. Vila, Casa, Floresta e Deserto, combate, boss do Oficial Vermelho, cutscenes, Save/Load, debug, checkpoints narrativos, inventário e progressão já estão presentes. O Capítulo 1 está implementado até o bloco 1D: retorno ao Vale, antiga estrada, Posto de Vigia e encontro com Edrin. Veja o [bloco 1D e suas flags](CHAPTER_1D.md).
+O Prólogo — O Nome que Falta e o Capítulo I — Ecos da Guerra estão completos. Vila, Casa, Floresta e Deserto, combate, boss do Oficial Vermelho, cutscenes, Save/Load, debug, checkpoints narrativos, inventário e progressão já estão presentes. Os blocos 1A–1G incluem a antiga estrada, o Posto de Vigia, Edrin, a escolha na Ponte de Namar, os documentos e o confronto com Soren no depósito, e o retorno ao Vale. O encerramento retoma as consequências da escolha, conversa com Alden, registra o destino da remessa e apresenta uma memória breve na casa antes da cartela final. Veja o [bloco 1E e suas escolhas](CHAPTER_1E.md), o [bloco 1F, combate e persistência](CHAPTER_1F.md) e o [encerramento 1G](CHAPTER_1G.md).
+
+O Capítulo II — O Preço da Memória está completo: a Parte A apresenta a Rota das Pedras Afundadas, a Encosta e a ressonância; a Parte B explora cinco setores da Câmara dos Testemunhos, com dois puzzles, registros, segredos, Vigia dos Registros e Iriel, Custódio do Lacre, em duas fases. O encerramento confirma o primeiro lacre voluntário e uma segunda intervenção, preserva duas decisões sobre registros e aponta o Mosteiro da Vigília. Veja a [Parte A](CHAPTER_2A.md) e o [conteúdo, recuperação e validação da Parte B](CHAPTER_2B.md).
 
 O pacote de personagens foi refinado em etapas: rosto e base do protagonista, idle/passos, espada curta e poses de ataque, dash e, depois, os demais atores. A espada mantém tamanho e empunhadura; sua máscara acompanha o alcance visual. O dash tem impulso e retorno de postura, com rastro breve, preservando seus parâmetros de gameplay. Civis, tropas, Oficial Vermelho e inimigos usam a mesma grade/paleta, com rostos legíveis e silhuetas próprias. Veja o [contrato visual e os previews](assets/vale_characters/README.md).
 
 ### Próximos passos
 
-1. Jogar o encontro com Edrin a partir da saída do Posto de Vigia.
-2. O destino da Ponte de Namar fica para o próximo bloco, ainda não implementado.
+1. Fazer um playtest humano do Capítulo II, observando dificuldade das duas fases, puzzles e interpretação dos registros.
+2. Desenvolver o Capítulo III a partir da Mesa de Revisão do Mosteiro da Vigília; esse conteúdo ainda não foi implementado.
 
 ## Executar
 
@@ -33,10 +35,11 @@ python main.py
 | `WASD` ou setas | Mover |
 | `Espaço` | Atacar |
 | `Q` | Dash (10 SP; curta esquiva na direção de movimento ou da última direção) |
-| `E` | Conversar, aceitar/entregar a missão ou abrir um baú |
+| `E` | Conversar, examinar, acionar ressonância ou abrir um baú |
 | `V` | Abrir atributos e equipamentos |
 | `I` | Abrir inventário |
 | `1`–`4` | Distribuir pontos de atributo ou usar a ação do item selecionado |
+| `1` / `2` durante escolhas | Decidir em Namar, sobre o termo de Inês ou sobre a guarda dos registros do núcleo |
 | Clique em `+` no menu `V` | Distribuir um ponto de atributo |
 | `Esc` | Fechar a tela atual ou sair |
 | `F5` | Salvar em `savegame.json` |

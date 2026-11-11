@@ -1,5 +1,9 @@
 # Histórico de atualizações — O Vale (Pygame)
 
+## 0.34 — Capítulo II: O Preço da Memória
+
+Parte A com rota, Encosta, investigação e ressonância; Parte B com cinco setores da Câmara, mecanismos, documentos, segredos, Vigia e Custódio em duas fases. Escolhas e recompensa persistentes, retorno a Inês, encerramento cinematográfico e pista do Mosteiro da Vigília. Capítulo III ainda não implementado.
+
 Resumo breve das mudanças por versão. O histórico reflete os marcos do projeto; versões sem tag Git foram registradas como marcos, não como releases formais.
 
 ## 0.32

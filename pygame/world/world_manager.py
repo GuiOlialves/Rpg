@@ -2,7 +2,9 @@
 from dataclasses import dataclass
 
 from entities.enemy import Enemy
-from world.regions import desert, forest, home, village, old_road, watchpost, pursuit
+from world.regions import desert, forest, home, village, old_road, watchpost, pursuit, namar, archive
+from world.regions import encosta, lacre
+from story.lacre_content import REGIONS as DUNGEON_REGIONS
 
 
 @dataclass
@@ -30,6 +32,12 @@ class WorldManager:
             "old_road": lambda opened_chests: old_road.build(load, opened_chests),
             "watchpost": lambda opened_chests: watchpost.build(load, opened_chests),
             "pursuit": lambda opened_chests: pursuit.build(load, opened_chests),
+            "namar": lambda opened_chests: namar.build(load, opened_chests),
+            'archive': lambda opened_chests: archive.build(load, opened_chests),
+            'forgotten_route': lambda opened_chests: encosta.route(load, opened_chests),
+            'encosta': lambda opened_chests: encosta.settlement(load, opened_chests),
+            'threshold': lambda opened_chests: encosta.threshold(load, opened_chests),
+            **{r: (lambda opened_chests, kind=r: lacre.build(kind,load,opened_chests)) for r in DUNGEON_REGIONS},
         }, load=load)
 
     @property
@@ -41,7 +49,11 @@ class WorldManager:
             builder = self._region_builders[region_id]
         except KeyError as exc:
             raise ValueError(f"Região desconhecida: {region_id}") from exc
-        return builder(opened_chests)
+        region = builder(opened_chests)
+        if self._load is not None and 'terrain' in region:
+            from world.visual_polish import apply
+            apply(region_id, region)
+        return region
 
     def spawn_enemies(self, region, load=None):
         load = load or self._load
@@ -54,6 +66,9 @@ class WorldManager:
         elif region.get("ambient_kind") == "watchpost":
             for index, enemy in enumerate(enemies):
                 enemy.watchpost_id = index
+        elif region.get("ambient_kind") == "namar":
+            for index, enemy in enumerate(enemies):
+                enemy.namar_id = index
         return enemies
 
     def reset_forest_boss_encounter(self, load=None):

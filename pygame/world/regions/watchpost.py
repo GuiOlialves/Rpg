@@ -2,6 +2,7 @@
 import random
 import pygame
 import environment as env
+from world import asset_art
 from entities.enemy import Enemy
 from entities.interactable import Interactable
 from world.regions.old_road_art import prop as road_prop
@@ -77,7 +78,7 @@ def build(load, _opened_chests=None):
 
     for i, foot in enumerate(((260,860),(435,945),(1010,945),(1370,855),(1340,515),
                               (1350,155),(280,310),(320,590),(1070,110),(580,105))):
-        tree = env.tint(env.resize(woods["tree"],2), (212,203,151))
+        tree = asset_art.tree(i%4,(132,178),dry=True)
         place(tree, foot, (-12,-8,24,16), True)
         place(env.resize(woods["bush"],2), (foot[0]+36,foot[1]+15), canopy=True)
     for _ in range(50):

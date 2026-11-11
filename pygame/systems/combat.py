@@ -28,6 +28,8 @@ class CombatFrame:
     defeated_soldiers: list = field(default_factory=list)
     defeated_road_enemies: list = field(default_factory=list)
     defeated_watchpost_enemies: list = field(default_factory=list)
+    defeated_namar_enemies: list = field(default_factory=list)
+    defeated_chapter2_enemies: list = field(default_factory=list)
 
 
 class CombatSystem:
@@ -41,6 +43,8 @@ class CombatSystem:
         defeated_soldiers = []
         defeated_road_enemies = []
         defeated_watchpost_enemies = []
+        defeated_namar_enemies = []
+        defeated_chapter2_enemies = []
         if region_id == "forest":
             region["north_locked"] = not quests.forest_boss_defeated
 
@@ -88,10 +92,15 @@ class CombatSystem:
             if new_drop is not None:
                 drops.append(new_drop)
             if enemy.state == "DEAD" and enemy.dead_timer == 35:
+                if hasattr(enemy,'chapter2_id'):
+                    defeated_chapter2_enemies.append((region_id,enemy.chapter2_id))
+                    autosave_pending=True
                 if region_id == "old_road" and hasattr(enemy,"road_id"):
                     defeated_road_enemies.append(enemy.road_id)
                 if region_id == "watchpost" and hasattr(enemy,"watchpost_id"):
                     defeated_watchpost_enemies.append(enemy.watchpost_id)
+                if region_id == 'namar' and hasattr(enemy, 'namar_id'):
+                    defeated_namar_enemies.append(enemy.namar_id)
                 if enemy.kind == "red_soldier" and hasattr(enemy, "scripted_id"):
                     defeated_soldiers.append(enemy.scripted_id)
                 old_level = player.level
@@ -132,4 +141,5 @@ class CombatSystem:
                 drops.remove(drop)
         return CombatFrame(enemies, drops, hitstop_frames, autosave_pending,
                            player.hp <= 0, feedback, defeated_soldiers, defeated_road_enemies,
-                           defeated_watchpost_enemies)
+                           defeated_watchpost_enemies, defeated_namar_enemies,
+                           defeated_chapter2_enemies)

@@ -89,6 +89,11 @@ def draw_item_icon(canvas, item, center, size=34):
             (center[0] + 7, center[1] + 3), (center[0], center[1] + 10),
             (center[0] - 7, center[1] + 3),
         ])
+    elif item.get('id')=='custody_medallion':
+        pygame.draw.circle(canvas,(35,40,37),center,14)
+        pygame.draw.circle(canvas,color,center,12,3)
+        for dx in (-6,0,6):
+            pygame.draw.arc(canvas,(233,217,168),pygame.Rect(center[0]+dx-4,center[1]-6,8,13),.4,5.8,2)
     else:
         pygame.draw.circle(canvas, (35, 40, 37), center, 11)
         pygame.draw.circle(canvas, color, center, 7)

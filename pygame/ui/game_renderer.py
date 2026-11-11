@@ -35,8 +35,8 @@ class GameRenderer:
              red_officer_scene=None, prologue_3c_scene=None,
              chapter1_return_scene=None,
              old_road_scene=None,
-             watchpost_scene=None, edrin_scene=None,
-             story=None, prologue_end_card=False):
+             watchpost_scene=None, edrin_scene=None, namar_scene=None, archive_scene=None, ending_scene=None,
+             story=None, prologue_end_card=False, chapter2_scene=None):
         if chapter1_return_scene is not None and chapter1_return_scene.active:
             if chapter1_return_scene.phase != "return":
                 chapter1_return_scene.draw_title(canvas)
@@ -56,15 +56,20 @@ class GameRenderer:
             self.shake_tick -= 1
         # Framing is presentation-only: no actor, collision or gameplay camera is moved.
         shot_scene = next((scene for scene in (
-            edrin_scene, watchpost_scene, old_road_scene, prologue_3c_scene, red_officer_scene, blue_march_scene,
+            chapter2_scene,
+            archive_scene, namar_scene, edrin_scene, watchpost_scene, old_road_scene, prologue_3c_scene, red_officer_scene, blue_march_scene,
             forest_ambush_scene, insignia_memory_scene, alden_scene)
             if scene is not None and scene.active), None)
         memory = (prologue_3c_scene is not None and prologue_3c_scene.active
                   and prologue_3c_scene.memory_visible)
         post_memory = bool(watchpost_scene is not None and watchpost_scene.memory_visible)
-        memory = memory or post_memory
+        memory = memory or post_memory or bool(namar_scene is not None and namar_scene.memory_visible)
+        archive_memory=bool(archive_scene is not None and archive_scene.memory_visible)
+        memory = memory or archive_memory
 
         def render_world(show_controls=True, scene_actors=(), include_player=True):
+            if region.get('ambient_kind') == 'archive' and region.get('boss_battle_active'):
+                show_controls=False
             world_player = player if include_player else None
             if region.get("ambient_kind") == "home":
                 # An integer close shot suits an interior. World positions and
@@ -85,6 +90,11 @@ class GameRenderer:
                 pygame.transform.scale(self.home_canvas, VIEW, canvas)
                 if show_controls:
                     draw_region_banner(canvas, region, font)
+            elif chapter2_scene is not None and chapter2_scene.phase in ('vista','b_core_vista'):
+                focus_x,focus_y=chapter2_scene.focus
+                panorama=(round(focus_x-VIEW[0]/2),round(focus_y-VIEW[1]/2))
+                draw_world(canvas,region,font,panorama,world_player,enemies,[],
+                           show_controls=False,show_banner=False,story_context=story)
             elif shot_scene is not None or (dialogue.active and arrival_scene is None):
                 if not hasattr(self, "shot_canvas"):
                     self.shot_canvas = pygame.Surface((768, 432))
@@ -92,8 +102,14 @@ class GameRenderer:
                 if shot_scene is alden_scene and alden_scene is not None:
                     focus_x = (player.x + alden_scene.alden.x) / 2
                     focus_y = (player.y + alden_scene.alden.y) / 2
+                elif shot_scene is chapter2_scene and chapter2_scene is not None:
+                    focus_x,focus_y=chapter2_scene.focus
                 elif shot_scene is edrin_scene and edrin_scene is not None:
                     focus_x,focus_y = edrin_scene.focus
+                elif shot_scene is namar_scene and namar_scene is not None:
+                    focus_x, focus_y = namar_scene.focus
+                elif shot_scene is archive_scene and archive_scene is not None:
+                    focus_x,focus_y=archive_scene.focus
                 elif shot_scene is old_road_scene and old_road_scene is not None:
                     focus_x,focus_y = old_road_scene.focus
                 elif shot_scene is watchpost_scene and watchpost_scene is not None:
@@ -131,8 +147,8 @@ class GameRenderer:
                 if memory:
                     # Keep the existing landscape, omitting present-day bodies and props.
                     backdrop = dict(region, objects=[],
-                                    terrain=region.get("memory_terrain",region["terrain"]) if post_memory else region["terrain"],
-                                    scenery=region.get("memory_scenery",region["scenery"]) if post_memory else [],
+                                    terrain=region.get("memory_terrain",region["terrain"]) if post_memory or archive_memory else region["terrain"],
+                                    scenery=region.get("memory_scenery",region["scenery"]) if post_memory or archive_memory else [],
                                     npcs=[], interactables=[])
                     world_player = None
                 draw_world(self.shot_canvas, backdrop, font, shot_camera,
@@ -147,6 +163,22 @@ class GameRenderer:
                            show_controls=show_controls, interaction_context=quest_manager,
                            scene_actors=scene_actors, story_context=story)
 
+        if chapter2_scene is not None and chapter2_scene.active:
+            from story.resonance import ResonanceScene
+            if isinstance(chapter2_scene,ResonanceScene):
+                def render_echo():
+                    render_world(show_controls=False)
+                    # Close-shot uses its own camera; scale the overlay with that shot.
+                    if getattr(self,'shot_camera',None) is not None:
+                        chapter2_scene.draw_overlay(self.shot_canvas,self.shot_camera)
+                        pygame.transform.scale(self.shot_canvas,VIEW,canvas)
+                    else: chapter2_scene.draw_overlay(canvas,camera)
+                draw_narrative(canvas,chapter2_scene.sequence,world_renderer=render_echo,font=font)
+            else: chapter2_scene.draw(canvas,lambda:render_world(show_controls=False),font,title_font)
+            return
+        if ending_scene is not None and ending_scene.active:
+            ending_scene.draw(canvas,lambda:render_world(show_controls=False))
+            return
         if prologue_end_card:
             draw_prologue_card(canvas)
             return
@@ -163,6 +195,28 @@ class GameRenderer:
                 render_encounter()
                 draw_letterbox(canvas)
                 dialogue.draw(canvas,font,title_font)
+            return
+        if archive_scene is not None and archive_scene.active:
+            def render_archive():
+                render_world(show_controls=False,scene_actors=archive_scene.world_actors,
+                             include_player=not archive_scene.memory_visible)
+                archive_scene.draw_overlay(canvas)
+            if archive_scene.sequence is not None:
+                draw_narrative(canvas,archive_scene.sequence,world_renderer=render_archive)
+            else:
+                render_archive(); draw_letterbox(canvas); dialogue.draw(canvas,font,title_font)
+            return
+        if namar_scene is not None and namar_scene.active:
+            def render_namar():
+                render_world(show_controls=False, scene_actors=namar_scene.world_actors,
+                             include_player=not namar_scene.memory_visible)
+                namar_scene.draw_overlay(canvas)
+            if namar_scene.sequence is not None:
+                draw_narrative(canvas, namar_scene.sequence, world_renderer=render_namar)
+            else:
+                render_namar()
+                draw_letterbox(canvas)
+                dialogue.draw(canvas, font, title_font)
             return
         if old_road_scene is not None and old_road_scene.active:
             def render_road_moment():
@@ -263,22 +317,31 @@ class GameRenderer:
             draw_hud(canvas, player, font)
         dialogue.draw(canvas, font, title_font)
         quest_text = (story.objective_text if story is not None else "") or quest_manager.active_text()
-        if quest_text and not cinematic and not dialogue.active and ui_mode is None:
+        if (quest_text and not cinematic and not dialogue.active and ui_mode is None
+                and not (region.get('ambient_kind') == 'archive' and region.get('boss_battle_active'))):
             draw_objective_tracker(canvas, quest_text, font,
                                    title=story.objective_title if story is not None else "OBJETIVO ATUAL")
         if (quest_manager.notice_timer and not cinematic and not dialogue.active
-                and ui_mode is None):
+                and ui_mode is None
+                and not (region.get('ambient_kind') == 'archive' and region.get('boss_battle_active'))):
             draw_notice(canvas, quest_manager.notice, font)
 
         boss = next((enemy for enemy in enemies
-                     if enemy.kind in {"forest_guardian", "red_officer"}
+                     if enemy.kind in {"forest_guardian", "red_officer",'archive_veteran'}
                      and enemy.state not in {"DEAD", "DEFEATED"}
                      and (enemy.kind != "red_officer" or region.get("boss_battle_active"))), None)
         if (boss and player.hp > 0 and game_over_screen is None
-                and region.get("ambient_kind") == "forest" and not cinematic
+                and region.get("ambient_kind") in {'forest','archive'} and not cinematic
                 and (boss.kind == "red_officer" or (not dialogue.active and ui_mode is None))):
-            draw_bar(canvas, pygame.Rect(280, 136, 464, 30), boss.hp,
+            bar=pygame.Rect(280,32,464,22) if boss.kind == 'archive_veteran' else pygame.Rect(280,136,464,30)
+            draw_bar(canvas, bar, boss.hp,
                      boss.max_hp, (166, 50, 62), boss.name, font)
+
+        defender=next((e for e in enemies if e.kind in {'record_warden','custodian'} and e.state!='DEAD'),None)
+        if defender and not dialogue.active and ui_mode is None and player.hp>0 and game_over_screen is None:
+            if defender.kind!='custodian' or region.get('boss_battle_active'):
+                draw_bar(canvas,pygame.Rect(280,130,464,24),defender.hp,defender.max_hp,
+                    (151,75,70),defender.name+(' · LACRE DESPERTO' if defender.phase==2 else ''),font)
 
         mouse = logical_mouse_position(pygame.mouse.get_pos())
         if ui_mode == "character":
